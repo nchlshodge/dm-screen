@@ -1,0 +1,83 @@
+{
+  "grid": { "cols": 28, "rows": 20 },
+
+  "camera": {
+    "index": 0,
+    "width": 1920,
+    "height": 1080,
+    "exposure": null
+  },
+
+  "projector": { "display": 1, "window_size": [1280, 800] },
+
+  "aruco_dict": "DICT_4X4_50",
+  "calibration_file": "calibration.json",
+  "mini_calibration_ids": [0, 1, 2, 3],
+  "projected_calibration_ids": [46, 47, 48, 49],
+
+  "players": { "1": "Fighter", "2": "Wizard", "3": "Rogue", "4": "Cleric" },
+
+  "dwell_seconds": 1.0,
+  "occlusion_grace_seconds": 2.0,
+  "light_pads": true,
+
+  "map": {
+    "base": "maps/base.png",
+    "layers": {
+      "trap": { "image": "maps/trap.png", "visible": false },
+      "treasure": { "image": "maps/treasure.png", "visible": false }
+    }
+  },
+
+  "fog": {
+    "enabled": true,
+    "start_revealed": ["entrance"],
+    "rooms": {
+      "entrance": [[0, 7, 6, 12]],
+      "hallway":  [[7, 9, 13, 10]],
+      "room_b":   [[14, 4, 22, 14]],
+      "vault":    [[23, 8, 27, 11]]
+    }
+  },
+
+  "triggers": [
+    {
+      "name": "Open the hallway",
+      "tags": "any",
+      "cells": [[6, 9], [6, 10]],
+      "once": true,
+      "actions": [ { "reveal": "hallway" }, { "sound": "sounds/door.wav" } ]
+    },
+    {
+      "name": "Enter room B",
+      "tags": "any",
+      "area": [13, 9, 14, 10],
+      "once": true,
+      "actions": [
+        { "reveal": "room_b" },
+        { "sound": "sounds/door.wav" },
+        { "message": "{player} opened room B" }
+      ]
+    },
+    {
+      "name": "Pressure plate",
+      "tags": "any",
+      "area": [18, 6, 19, 7],
+      "once": false,
+      "cooldown": 10,
+      "actions": [
+        { "show_layer": "trap" },
+        { "flash": "#ff2200", "seconds": 0.8 },
+        { "sound": "sounds/trap.wav" },
+        { "message": "TRAP! {player}, roll a DEX save" }
+      ]
+    },
+    {
+      "name": "Only the rogue finds the secret door",
+      "tags": [3],
+      "cells": [[22, 9]],
+      "once": true,
+      "actions": [ { "reveal": "vault" }, { "show_layer": "treasure" }, { "message": "{player} found a secret door" } ]
+    }
+  ]
+}

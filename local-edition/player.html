@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Join the Game</title>
+<style>
+/* VOICE: a kid's adventure companion: big, friendly, nothing to get lost in
+   IDEA: the player's half of the DM screen: one card for "me", one for messages, dice at hand
+   PICTURE: the join code boxes, then the character card with a big HP bar
+   COLOUR and TYPE: same teal cloth as the DM screen; system fonts so it works offline
+   LAYOUT: single column, phone first; sticky dice bar at the bottom */
+:root{color-scheme:light dark;--bg:light-dark(#eef0f3,#111419);--panel:light-dark(#fff,#1b1f26);--ink:light-dark(#151a21,#e8ecf2);--mut:light-dark(#5a6372,#98a2b3);--line:light-dark(#d9dee6,#2b313b);--soft:light-dark(#f5f7fa,#151920);--hero:light-dark(#0b7682,#41c4cf);--now:light-dark(#2c5fd6,#7ea6ff);--ok:light-dark(#1f7a3a,#58c97a);--foe:light-dark(#b8322a,#ff6b5d);--cloth:#0b3a41}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding-bottom:150px}
+h1,h2,h3{margin:0;line-height:1.15}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:1px solid var(--line);background:var(--panel);border-radius:10px;min-height:44px;padding:8px 14px;font-weight:700}
+button.pri{background:var(--now);border-color:var(--now);color:#fff}
+input,select{background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:17px;width:100%}
+:focus-visible{outline:3px solid var(--now);outline-offset:2px}
+header{background:var(--cloth);color:#eef7f6;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+header h1{font-size:22px}header span{color:#b9d7d6;font-size:14px}
+main{max-width:640px;margin:0 auto;padding:16px;display:grid;gap:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px}
+.hint{color:var(--mut);font-size:14px}
+.join{max-width:420px;margin:8vh auto 0;text-align:center}
+.join h2{font-size:28px;margin-bottom:6px}
+.code{display:flex;gap:10px;justify-content:center;margin:16px 0}
+.code input{width:64px;height:76px;text-align:center;font-size:38px;font-weight:800;padding:0}
+.err{color:var(--foe);font-weight:700;min-height:1.4em}
+.hp{height:16px;border-radius:9px;background:var(--line);overflow:hidden;margin:6px 0}.hp i{display:block;height:100%;background:var(--ok)}
+.hp i.mid{background:#d79b16}.hp i.low{background:var(--foe)}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;text-align:center;margin:10px 0}
+.stats div{background:var(--soft);border-radius:10px;padding:6px}.stats b{display:block;font-size:22px}
+.pips span{display:inline-block;width:18px;height:18px;border-radius:50%;border:2px solid var(--hero);background:var(--hero);margin-right:3px;vertical-align:middle}.pips span.u{background:transparent}
+.sec{margin-top:10px}.sec b{display:block}.pre{white-space:pre-wrap}
+.thread{display:flex;flex-direction:column;gap:8px;max-height:50vh;overflow:auto}
+.bub{max-width:85%;background:var(--soft);border:1px solid var(--line);border-radius:14px 14px 14px 4px;padding:8px 12px;align-self:flex-start}
+.bub.me{align-self:flex-end;background:light-dark(#e6efff,#1d2a45);border-radius:14px 14px 4px 14px}
+.hcard{border:3px solid #d9a21b;border-radius:12px;padding:10px;display:grid;gap:6px}.hcard img{max-width:100%;border-radius:8px}
+.row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin-top:10px}
+.dice{position:fixed;left:0;right:0;bottom:0;background:var(--panel);border-top:1px solid var(--line);padding:10px 12px calc(10px + env(safe-area-inset-bottom));box-shadow:0 -6px 20px -12px #0006}
+.dice .in{max-width:640px;margin:0 auto}
+.dg{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}.dg button{min-height:48px;padding:4px}.dg .d20{background:var(--now);color:#fff;border-color:var(--now)}
+.res{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}.res b{font-size:30px}.res .g{color:var(--ok)}.res .r{color:var(--foe)}
+.mod{display:flex;gap:6px;align-items:center;font-size:15px}.mod input{width:70px;padding:6px 8px}
+.list{display:grid;gap:8px;margin-top:10px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div id="joinView" class="card join" hidden>
+  <h2>Join the game</h2>
+  <p class="hint">Type your name and the 4 numbers on the DM's screen.</p>
+  <form id="jf" novalidate>
+    <label for="jname" class="hint" style="display:block;text-align:left">Your name</label>
+    <input id="jname" maxlength="24" autocomplete="nickname" required>
+    <div class="code" role="group" aria-label="Join code">
+      <input inputmode="numeric" maxlength="1" aria-label="Digit 1"><input inputmode="numeric" maxlength="1" aria-label="Digit 2"><input inputmode="numeric" maxlength="1" aria-label="Digit 3"><input inputmode="numeric" maxlength="1" aria-label="Digit 4">
+    </div>
+    <div class="err" id="jerr" role="alert"></div>
+    <button class="pri" style="width:100%;font-size:19px">Join</button>
+  </form>
+</div>
+
+<div id="gameView" hidden>
+  <header><h1 id="hname">Adventurer</h1><span id="conn">Connecting…</span></header>
+  <main>
+    <section class="card" id="meCard"></section>
+    <section class="card"><h3>Messages from the DM</h3>
+      <div class="thread" id="thread" style="margin-top:10px"></div>
+      <form class="row" id="sf"><input id="say" maxlength="300" placeholder="Message the DM…" autocomplete="off" aria-label="Message the DM"><button class="pri">Send</button></form>
+    </section>
+    <p class="hint" style="text-align:center"><button id="leave" style="min-height:36px;font-size:14px">Leave game</button></p>
+  </main>
+  <div class="dice"><div class="in">
+    <div class="res"><span id="rlab" class="hint">Tap a die to roll. The DM sees it.</span><b id="rtot"></b></div>
+    <div class="dg"><button class="d20" data-n="20">d20</button><button data-n="4">d4</button><button data-n="6">d6</button><button data-n="8">d8</button><button data-n="10">d10</button><button data-n="12">d12</button></div>
+    <div class="mod" style="margin-top:6px">Add <input id="dmod" type="number" inputmode="numeric" placeholder="0" aria-label="Add to roll"> <button id="adv" style="min-height:36px;font-size:14px">Advantage</button><button id="dis" style="min-height:36px;font-size:14px">Disadvantage</button></div>
+  </div></div>
+</div>
+
+<script>
+{
+const $=s=>document.querySelector(s);
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num=(v,d=0)=>{const n=parseFloat(v);return Number.isFinite(n)?n:d};
+const mod=s=>Math.floor((num(s,10)-10)/2),sg=n=>(n>=0?'+':'')+n;
+const ORD=['1st','2nd','3rd','4th','5th','6th','7th','8th','9th'];
+const store={get(k){try{return localStorage.getItem(k)}catch{return null}},set(k,v){try{v==null?localStorage.removeItem(k):localStorage.setItem(k,v)}catch{}}};
+let token=store.get('dm-token'),me={name:'',char:null,hero:null,heroes:[],messages:[]},es=null;
+const post=(u,b)=>fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}).then(async r=>{const j=await r.json().catch(()=>({}));if(r.status===401){leave();throw new Error('Please join again')}if(!r.ok)throw new Error(j.error||'Something went wrong');return j});
+
+// ---- join
+const digits=[...document.querySelectorAll('.code input')];
+digits.forEach((d,i)=>{d.addEventListener('input',()=>{d.value=d.value.replace(/\D/g,'').slice(-1);if(d.value&&digits[i+1])digits[i+1].focus()});
+  d.addEventListener('keydown',e=>{if(e.key==='Backspace'&&!d.value&&digits[i-1])digits[i-1].focus()});
+  d.addEventListener('paste',e=>{const t=(e.clipboardData.getData('text')||'').replace(/\D/g,'').slice(0,4);if(t.length===4){e.preventDefault();t.split('').forEach((c,k)=>digits[k].value=c);digits[3].focus()}})});
+$('#jname').value=store.get('dm-name')||'';
+$('#jf').addEventListener('submit',async e=>{e.preventDefault();const name=$('#jname').value.trim(),code=digits.map(d=>d.value).join('');
+  if(!name){$('#jerr').textContent='Type your name first.';return $('#jname').focus()}
+  if(code.length<4){$('#jerr').textContent='The code has 4 numbers.';return digits.find(d=>!d.value).focus()}
+  try{const j=await fetch('/api/join',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,code})});const r=await j.json();if(!j.ok)throw new Error(r.error||'Could not join');
+    token=r.token;store.set('dm-token',token);store.set('dm-name',name);start()}catch(err){$('#jerr').textContent=err.message||String(err)}});
+function showJoin(){$('#gameView').hidden=true;$('#joinView').hidden=false;($('#jname').value?digits[0]:$('#jname')).focus()}
+function leave(){if(es)es.close();es=null;token=null;store.set('dm-token',null);showJoin()}
+$('#leave').addEventListener('click',leave);
+
+// ---- game
+function start(){$('#joinView').hidden=true;$('#gameView').hidden=false;
+  if(es)es.close();es=new EventSource('/api/pevents?token='+encodeURIComponent(token));
+  es.onopen=()=>{$('#conn').textContent='Connected'};
+  es.onerror=async()=>{$('#conn').textContent='Reconnecting…';try{const r=await fetch('/api/pcheck?token='+encodeURIComponent(token||''));if(r.status===401){leave();$('#jerr').textContent='The game restarted. Join again with the new code.'}}catch{}};
+  es.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch{return}
+    if(m.type==='hello'){me={...me,...m};renderAll()}
+    else if(m.type==='msg'){me.messages.push(m.msg);renderMsgs(true);if(m.msg.from==='dm'&&navigator.vibrate)navigator.vibrate(120)}
+    else if(m.type==='hero'){me.hero=m.hero;if('char' in m)me.char=m.char;renderMe()}
+    else if(m.type==='heroes'){me.heroes=m.heroes;if(!me.char)renderMe()}
+    else if(m.type==='kicked'){leave();$('#jerr').textContent='The DM removed you from the game.'}}}
+function renderAll(){$('#hname').textContent=me.hero&&me.hero.name||me.name||'Adventurer';renderMe();renderMsgs(false)}
+function renderMe(){const h=me.hero,c=$('#meCard');$('#hname').textContent=h&&h.name||me.name||'Adventurer';
+  if(!me.char||!h){c.innerHTML=`<h3>Who are you playing?</h3>${me.heroes.length?`<div class="list">${me.heroes.map(x=>`<button data-c="${esc(x.id)}">${esc(x.name)}</button>`).join('')}</div>`:'<p class="hint">The DM hasn\'t added any characters yet. Hang on!</p>'}`;return}
+  const hp=num(h.hp),mx=num(h.hpMax),pct=mx?Math.max(0,Math.min(100,hp/mx*100)):0;
+  const slots=(h.slots||[]).map((s,l)=>s&&num(s.max)?`<div><span class="hint">${ORD[l]}</span> <span class="pips">${Array.from({length:num(s.max)},(_,k)=>`<span class="${k<num(s.used)?'u':''}"></span>`).join('')}</span></div>`:'').join('');
+  const sec=(t,v)=>v?`<div class="sec"><b>${t}</b><div class="pre">${esc(v)}</div></div>`:'';
+  c.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><h2>${esc(h.name||'Hero')}</h2><span class="hint">${esc([h.race,h.cls,h.level?'Level '+h.level:''].filter(Boolean).join(' · '))}</span></div>
+    <div style="display:flex;justify-content:space-between;margin-top:8px"><b>HP</b><span><b style="font-size:22px">${hp}</b> / ${mx}</span></div><div class="hp"><i class="${pct<=25?'low':pct<=50?'mid':''}" style="width:${pct}%"></i></div>
+    ${hp<=0&&mx>0?'<p style="color:var(--foe);font-weight:800;margin:6px 0">You\'re down! On your turn, roll a d20 death save: 10 or more is a success.</p>':''}
+    <div class="stats"><div><span class="hint">AC</span><b>${esc(h.ac??'–')}</b></div><div><span class="hint">Speed</span><b>${esc(h.speed||30)}</b></div><div><span class="hint">Initiative</span><b>${sg(h.initBonus!==''&&h.initBonus!=null?num(h.initBonus):mod(h.dex))}</b></div></div>
+    ${slots?`<div class="sec"><b>Spell slots</b>${slots}</div>`:''}${sec('Cantrips (free every turn)',h.cantrips)}${sec('Spells',h.spells)}${sec('Attacks',h.attacks)}${sec('Features',h.features)}
+    <p class="hint" style="margin-top:10px"><button data-c="" style="min-height:34px;font-size:14px">Change character</button></p>`}
+$('#meCard').addEventListener('click',e=>{const b=e.target.closest('[data-c]');if(!b)return;post('/api/pchar',{token,char:b.dataset.c||null}).catch(err=>alertMsg(err.message))});
+function renderMsgs(scroll){const t=$('#thread'),list=me.messages||[];
+  t.innerHTML=list.length?list.map(m=>{const mine=m.from!=='dm';return `<div class="bub ${mine?'me':''}"><div class="hint">${mine?'You':'DM'}${m.to==='all'&&!mine?' · to everyone':''}</div>${m.handout?`<div class="hcard">${m.handout.img?`<img src="/_blob/${encodeURIComponent(m.handout.img)}" alt="">`:''}<b>${esc(m.handout.title||'Handout')}</b>${m.handout.text?`<div class="pre">${esc(m.handout.text)}</div>`:''}</div>`:''}${m.text?`<div class="pre">${esc(m.text)}</div>`:''}</div>`}).join(''):'<p class="hint">Nothing yet. Secret notes from the DM show up here.</p>';
+  t.scrollTop=t.scrollHeight}
+$('#sf').addEventListener('submit',e=>{e.preventDefault();const v=$('#say').value.trim();if(!v)return;post('/api/psay',{token,text:v}).then(()=>{$('#say').value=''}).catch(err=>alertMsg(err.message))});
+function alertMsg(t){$('#rlab').textContent=t}
+
+// ---- dice
+function roll(n,count,keep){const rs=Array.from({length:count},()=>1+Math.floor(Math.random()*n));let k=rs[0];if(keep==='h')k=Math.max(...rs);if(keep==='l')k=Math.min(...rs);return{rs,k}}
+function doRoll(n,keep){const m=Math.round(num($('#dmod').value)),r=roll(n,keep?2:1,keep),total=r.k+m,nat=n===20?r.k:null;
+  const label=keep==='h'?'Advantage':keep==='l'?'Disadvantage':'';const detail=`${keep?'2':'1'}d${n}${keep?(keep==='h'?'kh1':'kl1'):''} [${r.rs.join(', ')}]${m?' '+sg(m).replace(/^([+-])/,'$1 '):''}`;
+  $('#rtot').textContent=total;$('#rtot').className=nat===20?'g':nat===1?'r':'';$('#rlab').textContent=`d${n}${keep?' '+label.toLowerCase():''}${m?' '+sg(m):''}${nat===20?' · Natural 20!':nat===1?' · Natural 1':''}`;
+  post('/api/proll',{token,roll:{expr:`${keep?'2':'1'}d${n}${keep?(keep==='h'?'kh1':'kl1'):''}${m?sg(m):''}`,total,detail,nat,label}}).catch(()=>{})}
+document.querySelectorAll('.dg button').forEach(b=>b.addEventListener('click',()=>doRoll(+b.dataset.n)));
+$('#adv').addEventListener('click',()=>doRoll(20,'h'));$('#dis').addEventListener('click',()=>doRoll(20,'l'));
+
+// ---- boot
+(async()=>{if(!token)return showJoin();try{const r=await fetch('/api/pcheck?token='+encodeURIComponent(token));if(r.ok)return start()}catch{}leave()})();
+}
+</script>
+</body>
+</html>

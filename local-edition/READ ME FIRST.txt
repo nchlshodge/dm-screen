@@ -1,0 +1,33 @@
+DM SCREEN - LOCAL EDITION
+Players join from their own phone or tablet on your Wi-Fi with a 4-digit code. No accounts.
+
+WHAT YOU NEED
+- Python 3 (free). Windows: get it from https://www.python.org/downloads/ and tick
+  "Add Python to PATH" while installing. Macs usually have it already.
+- Everyone on the same Wi-Fi.
+
+START A GAME
+1. Windows: double-click "Start DM Screen (Windows).bat"
+   Mac: double-click "Start DM Screen (Mac).command" (the first time: right-click it, choose Open)
+2. If Windows asks about the firewall, click "Allow" for Private networks.
+   (Without this, players can't connect.)
+3. Your browser opens the DM Screen. Go to the Players tab.
+4. Players open the address shown there (like http://192.168.1.20:8080/play)
+   and type the 4-digit code.
+5. For the projector or TV: open http://localhost:8080/#table in a new browser
+   window, drag it to that screen and click Full screen.
+
+Keep the black program window open while you play. Close it to stop.
+Your game saves in the "data" folder. Copy that folder to back it up.
+
+WHAT PLAYERS CAN DO
+- See their own character sheet (HP, AC, spell slots, cantrips, spells), live.
+- Get private messages and handouts you send just to them.
+- Message you back.
+- Roll dice. Rolls show in your Dice log and on the table screen.
+
+IF A PLAYER CAN'T CONNECT
+- Check they're on the same Wi-Fi (not phone data, and not a "guest" network).
+- On Windows, allow the program through the firewall (step 2), or search
+  "Allow an app through Windows Firewall" and tick Python for Private networks.
+- If the program is closed and reopened, the join code changes: players join again.

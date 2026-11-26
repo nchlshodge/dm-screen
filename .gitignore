@@ -1,1 +1,7 @@
 data/
+__pycache__/
+*.pyc
+calibration.json
+tags.pdf
+tags.png
+.DS_Store
