@@ -142,7 +142,7 @@ function renderMe(){const h=me.hero,c=$('#meCard');$('#hname').textContent=h&&h.
     <div style="display:flex;justify-content:space-between;margin-top:8px"><b>HP</b><span><b style="font-size:22px">${hp}</b> / ${mx}</span></div><div class="hp"><i class="${pct<=25?'low':pct<=50?'mid':''}" style="width:${pct}%"></i></div>
     ${hp<=0&&mx>0?'<p style="color:var(--foe);font-weight:800;margin:6px 0">You\'re down! On your turn, roll a d20 death save: 10 or more is a success.</p>':''}
     <div class="stats"><div><span class="hint">AC</span><b>${esc(h.ac??'–')}</b></div><div><span class="hint">Speed</span><b>${esc(h.speed||30)}</b></div><div><span class="hint">Initiative</span><b>${sg(h.initBonus!==''&&h.initBonus!=null?num(h.initBonus):mod(h.dex))}</b></div></div>
-    ${slots?`<div class="sec"><b>Spell slots</b>${slots}</div>`:''}${sec('Cantrips (free every turn)',h.cantrips)}${sec('Spells',h.spells)}${sec('Attacks',h.attacks)}${sec('Features',h.features)}
+    ${slots?`<div class="sec"><b>Spell slots</b>${slots}</div>`:''}${sec('Cantrips (free every turn)',h.cantrips)}${sec('Spells',h.spells)}${sec('Attacks',h.attacks)}${sec('Features',h.features)}${sec('Magic items and effects',h.magic)}
     <p class="hint" style="margin-top:10px"><button data-c="" style="min-height:34px;font-size:14px">Change character</button></p>`}
 $('#meCard').addEventListener('click',e=>{const b=e.target.closest('[data-c]');if(!b)return;post('/api/pchar',{token,char:b.dataset.c||null}).catch(err=>alertMsg(err.message))});
 function renderMsgs(scroll){const t=$('#thread'),list=me.messages||[];
