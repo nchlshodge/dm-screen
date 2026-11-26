@@ -170,6 +170,10 @@ const prof=l=>2+Math.floor((Math.max(1,num(l,1))-1)/4);
 
 // ---------------- state
 const TABLE=location.hash==='#table';
+// Online edition: this page was opened at /s/<CODE>/dm on the DM Screen server.
+const OL=(location.pathname.match(/^\/s\/([A-Z]{2,8}-\d{2})\/dm\/?$/)||[])[1]||null;
+const BASE=OL?'/s/'+OL:'';
+let DMKEY=null;
 const defMap=()=>({img:null,name:'Map 1',sceneId:null,cols:24,rows:18,fogOn:true,fog:'',tokens:{},draw:[],auras:{},walls:{},weather:'none',autoDoor:true,showTokens:true,monBars:false,grid:false,table:{zoom:100,dx:0,dy:0,rot:0},rem:{order:true,turn:true,rolls:false,conds:true,dice:true},card:null,handout:null});
 // ---------------- rules reminders (plain-language summaries)
 const COND_TXT={Blinded:"Can't see. Attacks against it have advantage; its attacks have disadvantage.",Charmed:"Can't attack the one who charmed it.",Concentrating:"If hit, make a CON save (DC 10, or half the damage if higher) or the spell ends.",Deafened:"Can't hear.",Exhaustion:"Each level makes d20 rolls harder. Check the rules for the level.",Frightened:"Disadvantage on attacks and checks while the scary thing is in sight. Can't move closer to it.",Grappled:"Speed is 0.",Incapacitated:"No actions, bonus actions or reactions.",Invisible:"Attacks against it have disadvantage; its attacks have advantage.",Paralyzed:"Can't move or act. Attacks against it have advantage, and hits from 5 feet are critical hits.",Petrified:"Turned to stone. Can't move or act.",Poisoned:"Disadvantage on attack rolls and ability checks.",Prone:"On the ground. Its attacks have disadvantage. Close attacks against it have advantage, far ones disadvantage. Standing up costs half its speed.",Restrained:"Speed 0. Attacks against it have advantage; its attacks have disadvantage.",Stunned:"Can't move or act. Attacks against it have advantage.",Unconscious:"Drops what it holds and falls prone. Attacks against it have advantage, and hits from 5 feet are critical hits."};
@@ -199,7 +203,7 @@ async function flush(path){
     else if(e&&e.code==='quota_exceeded'){setStatus('Storage is full. Delete some old monsters or characters.')}
     else setStatus('Could not save: '+((e&&e.message)||e))}
   busy[path]=false;
-  if(path in pend)flush(path);else if(!Object.keys(pend).length&&!Object.values(busy).some(Boolean)&&!readOnly)setStatus(LAN.on?'Saved on this computer':'All changes saved')}
+  if(path in pend)flush(path);else if(!Object.keys(pend).length&&!Object.values(busy).some(Boolean)&&!readOnly)setStatus(savedMsg())}
 const pending=p=>(p in pend)||busy[p];
 function saveLocal(){try{const m=clone(S.map);if(m.img&&String(m.img).startsWith('blob:'))m.img=null;localStorage.setItem('dm-screen-v1',JSON.stringify({heroes:S.heroes,monsters:S.monsters,tables:S.tables,handouts:S.handouts,scenes:S.scenes,dice:S.dice,combat:S.combat,map:m}))}catch{}setStatus('Saved in this browser only')}
 const saveHero=id=>S.heroes[id]&&save('heroes/'+id,S.heroes[id]);
@@ -257,7 +261,7 @@ function fogArr(){const m=S.map,n=m.cols*m.rows,a=new Uint8Array(n),h=m.fog||'';
 function fogStr(a){let s='';for(let i=0;i<a.length;i+=4){let v=0;for(let k=0;k<4;k++)if(a[i+k])v|=1<<k;s+=v.toString(16)}return s}
 let mapImg=null,mapImgSrc=null,ping=null,ruler=null,rulerEmit=0;
 function imgFor(){const id=S.map.img;if(!id){mapImg=null;mapImgSrc=null;return null}
-  const src=String(id).startsWith('blob:')?id:'/_blob/'+encodeURIComponent(id);
+  const src=String(id).startsWith('blob:')?id:BASE+'/_blob/'+encodeURIComponent(id);
   if(src!==mapImgSrc){mapImgSrc=src;mapImg=new Image();mapImg.onload=()=>drawAll();mapImg.src=src}return mapImg&&mapImg.complete&&mapImg.naturalWidth?mapImg:null}
 const tokLabel=r=>{const n=nameOf(r);if(r.kind==='hero')return n.slice(0,2);const d=String(n).match(/(\d+)$/);return n.slice(0,1)+(d?d[1]:'')};
 let geom=null;
@@ -300,7 +304,7 @@ function drawMap(cv,table){
   if(ping&&Date.now()-ping.t<1600){const k=(Date.now()-ping.t)/1600;x.beginPath();x.arc((ping.x+.5)*cell,(ping.y+.5)*cell,cell*(.4+k*2.2),0,7);x.strokeStyle=`rgba(255,210,63,${1-k})`;x.lineWidth=Math.max(3,cell*.12);x.stroke();requestAnimationFrame(drawAll)}
   x.restore()}
 function drawAll(){wxStart();const a=document.getElementById('dmcv');if(a)drawMap(a,false);const b=document.getElementById('tbl');if(b){drawMap(b,true);renderOverlay()}}
-const blobSrc=id=>String(id).startsWith('blob:')?id:'/_blob/'+encodeURIComponent(id);
+const blobSrc=id=>String(id).startsWith('blob:')?id:BASE+'/_blob/'+encodeURIComponent(id);
 function handoutCard(ho,cls){return `<div class="${cls}">${ho.img?`<img src="${esc(blobSrc(ho.img))}" alt="${esc(ho.title||'Handout')}">`:''}${ho.title?`<h3>${esc(ho.title)}</h3>`:''}${ho.text?`<div class="pre">${esc(ho.text)}</div>`:''}</div>`}
 function renderOverlay(){const ov=document.getElementById('ov');if(!ov)return;const R=S.map.rem||{},rot=((num(S.map.table&&S.map.table.rot)%360)+360)%360,side=rot===90||rot===270;
   ov.style.width=side?'100vh':'100vw';ov.style.height=side?'100vw':'100vh';ov.style.transform=`translate(-50%,-50%) rotate(${rot}deg)`;
@@ -658,7 +662,7 @@ function vMap(){
    <p class="hint">Match these to the grid printed on your map so the squares line up.</p>
    <label style="display:flex;gap:8px;align-items:center;color:var(--ink)"><input type="checkbox" data-mc="fogOn" style="width:auto" ${m.fogOn?'checked':''}> Fog of war</label></section>
   <section><details id="dt-table"><summary><b>Table screen setup</b></summary>
-   <p class="hint">${LAN.on?`Open <span class="code">${esc(location.origin)}/#table</span> in a <b>new browser window</b>`:`Open this page's link in a <b>new browser window</b>, add <span class="code">#table</span> to the end of the address`}, drag that window onto the projector or TV, and press its Full screen button.</p>
+   <p class="hint">${LAN.on?`Open <span class="code">${esc(OL?location.origin+BASE+'/dm#table':location.origin+'/#table')}</span> in a <b>new browser window</b>`:`Open this page's link in a <b>new browser window</b>, add <span class="code">#table</span> to the end of the address`}, drag that window onto the projector or TV, and press its Full screen button.</p>
    <label style="display:flex;gap:8px;align-items:center;color:var(--ink)"><input type="checkbox" data-mc="showTokens" style="width:auto" ${m.showTokens?'checked':''}> Show tokens (turn off for real minis)</label>
    <label style="display:flex;gap:8px;align-items:center;color:var(--ink);margin-top:4px"><input type="checkbox" data-mc="monBars" style="width:auto" ${m.monBars?'checked':''}> Show monster health bars</label>
    <label style="display:flex;gap:8px;align-items:center;color:var(--ink);margin-top:4px"><input type="checkbox" data-mc="grid" style="width:auto" ${m.grid?'checked':''}> Show grid lines</label>
@@ -731,6 +735,7 @@ function act(a,ds,el){
   case 'snew':return newScene();
   case 'sgo':if(ds.id)switchScene(ds.id);return;
   case 'sdel':if(ui.arm!=='sdel'+ds.id){ui.arm='sdel'+ds.id;return render()}ui.arm=null;delete S.scenes[ds.id];save('scenes/'+ds.id,null);return render();
+  case 'copyjoin':case 'copydm':{const u=a==='copydm'?location.origin+BASE+'/dm?k='+encodeURIComponent(DMKEY||''):LAN.url;(navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(()=>toast(a==='copydm'?'DM link copied. Keep it private.':'Join link copied')).catch(()=>toast(u));return}
   case 'newcode':lanPost('/api/newcode',{}).then(j=>{LAN.code=j.code;render();toast('New code: '+j.code)}).catch(e=>toast(e.message));return;
   case 'psel':LAN.sel=ds.id;return render();
   case 'psend':{const t=String(ui.tmp.pmsg||'').trim();if(!t)return document.getElementById('pmsg')?.focus();lanPost('/api/tell',{to:LAN.sel,text:t}).then(()=>{ui.tmp.pmsg='';render();document.getElementById('pmsg')?.focus()}).catch(e=>toast(e.message));return}
@@ -838,29 +843,61 @@ function startTable(){
 
 // ---------------- local edition (players join on your Wi-Fi)
 const LAN={on:false,code:'',url:'',players:[],chat:[],sel:'all',unread:0};
-const lanPost=(u,b)=>fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}).then(async r=>{const j=await r.json().catch(()=>({}));if(!r.ok)throw{code:r.status>=500?'unavailable':'invalid_argument',message:j.error||('Server said '+r.status)};return j});
-async function lanConnect(){
-  if(!/^https?:$/.test(location.protocol))return null;
-  try{const r=await fetch('/api/ping',{cache:'no-store'});if(!r.ok)return null;const j=await r.json();if(!j.ok||!j.local)return null}catch{return null}
-  const docs={},subs=[],roomL={},tab=uid();
+const lanPost=(u,b)=>fetch(BASE+u,{method:'POST',headers:{'Content-Type':'application/json',...(OL&&DMKEY?{'X-DM-Key':DMKEY}:{})},body:JSON.stringify(b)}).then(async r=>{const j=await r.json().catch(()=>({}));if(!r.ok)throw{code:r.status>=500?'unavailable':'invalid_argument',message:j.error||('Server said '+r.status)};return j});
+function savedMsg(){return OL?'Saved online':LAN.on?'Saved on this computer':'All changes saved'}
+// Both editions (this computer / online) talk through the same three interfaces. Only the way
+// messages travel differs: lanConnect() uses fetch + EventSource, onlineConnect() fetch + a WebSocket.
+function makeAdapter(docs,upload){
+  const subs=[],roomL={},tab=uid();
   const meta={fromCache:false,hasPendingWrites:false};
   const snapCol=n=>{const ds=Object.keys(docs).filter(p=>p.startsWith(n+'/')&&p.split('/').length===2).map(p=>({id:p.split('/')[1],exists:true,data:()=>docs[p],metadata:meta}));return{docs:ds,size:ds.length,empty:!ds.length,metadata:meta,docChanges:()=>[]}};
   const snapDoc=p=>({id:p.split('/').pop(),exists:p in docs,data:()=>docs[p],metadata:meta});
   const notify=path=>{for(const x of subs){if(x.kind==='col'&&path.startsWith(x.name+'/')&&path.split('/').length===2)x.cb(snapCol(x.name));if(x.kind==='doc'&&path===x.name)x.cb(snapDoc(x.name))}};
-  const st=await (await fetch('/api/state',{cache:'no-store'})).json();Object.assign(docs,st.docs||{});
-  LAN.code=st.code;LAN.url=st.url;LAN.players=st.players||[];LAN.chat=st.chat||[];
-  const es=new EventSource('/api/events');let down=null;
-  es.onopen=()=>{clearTimeout(down);if(statusEl.textContent.startsWith('Lost'))setStatus('Reconnected')};
-  es.onerror=()=>{clearTimeout(down);down=setTimeout(()=>setStatus('Lost the connection to the DM Screen program. Is its window still open?'),3000)};
-  es.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch{return}
-    if(m.type==='doc'){if(m.data==null)delete docs[m.path];else docs[m.path]=m.data;notify(m.path)}
-    else if(m.type==='room'){for(const f of roomL[m.topic]||[])f({topic:m.topic,data:m.data,sameTab:m.tab===tab,isMe:true})}
-    else lanEvent(m)};
   const db={collection:name=>({onSnapshot(cb){const x={kind:'col',name,cb};subs.push(x);setTimeout(()=>cb(snapCol(name)));return()=>subs.splice(subs.indexOf(x),1)}}),
     doc:path=>({set:d=>lanPost('/api/set',{path,data:d}),delete:()=>lanPost('/api/set',{path,data:null}),onSnapshot(cb){const x={kind:'doc',name:path,cb};subs.push(x);setTimeout(()=>cb(snapDoc(path)));return()=>subs.splice(subs.indexOf(x),1)}})};
   const room={emit:(topic,data)=>lanPost('/api/emit',{topic,data,tab}),on:(topic,fn)=>{(roomL[topic]=roomL[topic]||[]).push(fn);return()=>{}}};
-  const assets={upload:async f=>{const r=await fetch('/api/upload',{method:'POST',headers:{'Content-Type':f.type||'application/octet-stream','X-Filename':encodeURIComponent(f.name||'file')},body:f});const j=await r.json().catch(()=>({}));if(!r.ok)throw{message:j.error||'Upload failed'};return j}};
-  return{db,room,assets}}
+  const feed=m=>{
+    if(m.type==='doc'){if(m.data==null)delete docs[m.path];else docs[m.path]=m.data;notify(m.path)}
+    else if(m.type==='room'){for(const f of roomL[m.topic]||[])f({topic:m.topic,data:m.data,sameTab:m.tab===tab,isMe:true})}
+    else if(m.type==='sync'){for(const k of Object.keys(docs))delete docs[k];Object.assign(docs,m.docs||{});LAN.code=m.code||LAN.code;LAN.players=m.players||[];LAN.chat=m.chat||[];
+      for(const x of subs)x.kind==='col'?x.cb(snapCol(x.name)):x.cb(snapDoc(x.name));if(!TABLE)render()}
+    else lanEvent(m)};
+  return{db,room,assets:{upload},feed}}
+async function lanConnect(){
+  if(!/^https?:$/.test(location.protocol))return null;
+  try{const r=await fetch('/api/ping',{cache:'no-store'});if(!r.ok)return null;const j=await r.json();if(!j.ok||!j.local)return null}catch{return null}
+  const docs={};
+  const st=await (await fetch('/api/state',{cache:'no-store'})).json();Object.assign(docs,st.docs||{});
+  LAN.code=st.code;LAN.url=st.url;LAN.players=st.players||[];LAN.chat=st.chat||[];
+  const upload=async f=>{const r=await fetch('/api/upload',{method:'POST',headers:{'Content-Type':f.type||'application/octet-stream','X-Filename':encodeURIComponent(f.name||'file')},body:f});const j=await r.json().catch(()=>({}));if(!r.ok)throw{message:j.error||'Upload failed'};return j};
+  const A=makeAdapter(docs,upload);
+  const es=new EventSource('/api/events');let down=null;
+  es.onopen=()=>{clearTimeout(down);if(statusEl.textContent.startsWith('Lost'))setStatus('Reconnected')};
+  es.onerror=()=>{clearTimeout(down);down=setTimeout(()=>setStatus('Lost the connection to the DM Screen program. Is its window still open?'),3000)};
+  es.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch{return}A.feed(m)};
+  return{db:A.db,room:A.room,assets:A.assets}}
+// Online edition: the DM key comes in the link (?k=...), is kept in this browser, then removed from the address bar.
+async function onlineConnect(){
+  if(!OL)return null;
+  const q=new URLSearchParams(location.search);let k=q.get('k');
+  if(k){try{localStorage.setItem('dm-key-'+OL,k)}catch{}history.replaceState(null,'',location.pathname+location.hash)}
+  else{try{k=localStorage.getItem('dm-key-'+OL)}catch{}}
+  if(!k)throw new Error("This page needs your private DM link. Open the full link you got when you started the game.");
+  DMKEY=k;
+  let r;try{r=await fetch(BASE+'/api/state',{headers:{'X-DM-Key':DMKEY},cache:'no-store'})}catch{throw new Error("Can't reach the DM Screen server. Check your internet.")}
+  if(!r.ok)throw new Error(r.status===404?'That game no longer exists.':"That DM link doesn't work. Open the full link you got when you started the game.");
+  const st=await r.json(),docs={};Object.assign(docs,st.docs||{});
+  LAN.code=st.code;LAN.url=location.origin+BASE+'/';LAN.players=st.players||[];LAN.chat=st.chat||[];
+  const upload=async f=>{const r=await fetch(BASE+'/api/upload',{method:'POST',headers:{'Content-Type':f.type||'application/octet-stream','X-DM-Key':DMKEY},body:f});const j=await r.json().catch(()=>({}));if(!r.ok)throw{message:j.error||'Upload failed'};return j};
+  const A=makeAdapter(docs,upload);
+  let skipSync=true,retry=0,ping=null;
+  const open=()=>{
+    const ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host+BASE+'/ws',['dm.'+DMKEY]);
+    ws.onopen=()=>{retry=0;if(statusEl.textContent.startsWith('Lost'))setStatus('Reconnected');clearInterval(ping);ping=setInterval(()=>{try{ws.send('ping')}catch{}},25000)};
+    ws.onmessage=e=>{if(e.data==='pong')return;let m;try{m=JSON.parse(e.data)}catch{return}if(m.type==='sync'&&skipSync){skipSync=false;return}A.feed(m)};
+    ws.onclose=()=>{clearInterval(ping);skipSync=false;setStatus('Lost the connection. Trying again…');setTimeout(open,Math.min(10000,1000*2**retry++))}};
+  open();
+  return{db:A.db,room:A.room,assets:A.assets}}
 const pName=pid=>pid==='dm'?'You':pid==='all'?'Everyone':((LAN.players.find(p=>p.pid===pid)||{}).name||'A player who left');
 function lanEvent(m){
   if(m.type==='players'){LAN.players=m.players||[];if(TABLE)return;if(ui.tab==='players')render()}
@@ -874,7 +911,8 @@ function vPlayers(){
   const hs=Object.entries(S.handouts).sort((a,b)=>String(a[1].title).localeCompare(b[1].title));
   const bubble=m=>{const mine=m.from==='dm';return `<div class="bub ${mine?'me':''}"><div class="hint">${mine?`You → ${esc(pName(m.to))}`:esc(pName(m.from))} · ${esc(new Date(m.t).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}))}</div>${m.handout?`<div class="hcard">${m.handout.img?`<img src="${esc(blobSrc(m.handout.img))}" alt="">`:''}<b>${esc(m.handout.title||'Handout')}</b>${m.handout.text?`<div class="pre">${esc(m.handout.text)}</div>`:''}</div>`:''}${m.text?`<div class="pre">${esc(m.text)}</div>`:''}</div>`};
   return `<div class="two"><div>
-  <div class="card joinc"><div><div class="hint">Players open this on a phone or tablet on your Wi-Fi</div><div class="jurl">${esc(LAN.url)}</div></div><div class="jcode"><div class="hint">Join code</div><b>${esc(LAN.code)}</b><button class="sm" data-a="newcode">New code</button></div></div>
+  <div class="card joinc"><div><div class="hint">${OL?'Players open this on any phone or tablet, anywhere':'Players open this on a phone or tablet on your Wi-Fi'}</div><div class="jurl">${esc(LAN.url)}</div></div><div class="jcode"><div class="hint">Join code</div><b>${esc(LAN.code)}</b>${OL?'<button class="sm" data-a="copyjoin">Copy join link</button>':'<button class="sm" data-a="newcode">New code</button>'}</div></div>
+  ${OL?'<p class="hint" style="margin:8px 0 0">Your private DM link opens this game on another device. Keep it secret. <button class="sm" data-a="copydm">Copy DM link</button></p>':''}
   <div class="card" style="margin-top:16px"><div class="bar"><label for="psel" style="color:var(--ink);font-weight:700">Talking to</label><select id="psel" style="width:auto"><option value="all">Everyone</option>${ps.map(p=>`<option value="${p.pid}" ${sel===p.pid?'selected':''}>${esc(p.name)}${p.charName?' ('+esc(p.charName)+')':''}</option>`).join('')}</select></div>
    <div class="thread" id="pthread">${thread.length?thread.map(bubble).join(''):'<p class="hint">No messages yet. Messages you send only go to the player you pick.</p>'}</div>
    <div class="grid2" style="grid-template-columns:minmax(0,1fr) auto;margin-top:10px"><input id="pmsg" data-tmp="1" value="${tmpv('pmsg')}" placeholder="Message to ${esc(pName(sel))}…" autocomplete="off"><button class="pri" data-a="psend">Send</button></div>
@@ -887,12 +925,12 @@ let loadTimer=null;
 async function boot(){
   if(TABLE)startTable();else route();
   db=await use('db');let L=null;
-  if(!db){L=await lanConnect();if(L)db=L.db}
+  if(!db){if(OL){try{L=await onlineConnect()}catch(e){setStatus(e.message||String(e));return render()}}else L=await lanConnect();if(L)db=L.db}
   if(!db){mode='local';try{const d=JSON.parse(localStorage.getItem('dm-screen-v1')||'null');if(d){Object.assign(S,d);S.map={...defMap(),...d.map}}}catch{}setStatus(TABLE?'':'Not connected: saving in this browser only');return render()}
   mode='db';if(L){room=L.room;assets=L.assets;LAN.on=true;render()}else{const [u,rm,as]=await Promise.all([use('user'),use('room'),use('assets')]);room=rm;assets=as;
   try{if(u&&(await u.can('data.write'))===false){readOnly=true}}catch{}}
   loadTimer=setTimeout(()=>setStatus("Can't reach your saved game yet. Check your connection."),10000);
-  const done=()=>{clearTimeout(loadTimer);if(!readOnly&&!Object.keys(pend).length)setStatus(TABLE?'':LAN.on?'Saved on this computer':'All changes saved');if(readOnly)setStatus('View only: you can look but not change things')};
+  const done=()=>{clearTimeout(loadTimer);if(!readOnly&&!Object.keys(pend).length)setStatus(TABLE?'':savedMsg());if(readOnly)setStatus('View only: you can look but not change things')};
   const onErr=e=>{clearTimeout(loadTimer);setStatus('Lost the connection to your saved game. Reload the page.')};
   const col=name=>db.collection(name).onSnapshot(snap=>{const m={};for(const d of snap.docs){const p=name+'/'+d.id;if(pending(p)){if(S[name][d.id])m[d.id]=S[name][d.id]}else m[d.id]=clone(d.data())}
       for(const id in S[name])if(!m[id]&&(name+'/'+id) in pend&&pend[name+'/'+id]!==null)m[id]=S[name][id];

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>DM Screen</title>
+<style>
+:root{color-scheme:light dark;--bg:light-dark(#eef0f3,#111419);--panel:light-dark(#fff,#1b1f26);--ink:light-dark(#151a21,#e8ecf2);--mut:light-dark(#5a6372,#98a2b3);--line:light-dark(#d9dee6,#2b313b);--soft:light-dark(#f5f7fa,#151920);--now:light-dark(#2c5fd6,#7ea6ff);--foe:light-dark(#b8322a,#ff6b5d);--cloth:#0b3a41}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{background:var(--cloth);color:#eef7f6;padding:18px 16px;text-align:center}
+header h1{margin:0;font-size:26px}header p{margin:4px 0 0;color:#b9d7d6;font-size:15px}
+main{max-width:460px;margin:0 auto;padding:16px;display:grid;gap:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px}
+h2{margin:0 0 6px;font-size:21px}.hint{color:var(--mut);font-size:14px;margin:0 0 10px}
+button,input{font:inherit;color:inherit}
+input{width:100%;background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:22px;text-align:center;text-transform:uppercase;letter-spacing:.06em}
+button{cursor:pointer;border:1px solid var(--line);background:var(--panel);border-radius:10px;min-height:46px;padding:8px 14px;font-weight:700;width:100%;margin-top:10px}
+button.pri{background:var(--now);border-color:var(--now);color:#fff;font-size:18px}
+:focus-visible{outline:3px solid var(--now);outline-offset:2px}
+.err{color:var(--foe);font-weight:700;min-height:1.4em;margin-top:6px}
+#resume{display:grid;gap:8px}#resume a{display:block;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--soft);color:inherit;text-decoration:none;font-weight:700;text-align:center}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<header><h1>DM Screen</h1><p>Tabletop adventures, together</p></header>
+<main>
+  <section class="card">
+    <h2>Join a game</h2>
+    <p class="hint">Type the code on the DM's screen. It looks like WOLF-42.</p>
+    <form id="jf" novalidate>
+      <input id="code" maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="WOLF-42" aria-label="Game code">
+      <div class="err" id="err" role="alert"></div>
+      <button class="pri">Next</button>
+    </form>
+  </section>
+  <section class="card" id="resumeCard" hidden>
+    <h2>Your games</h2>
+    <div id="resume"></div>
+  </section>
+  <section class="card">
+    <h2>I'm the DM</h2>
+    <p class="hint">Start a new game and get a code to share. Your players join from their own phones, anywhere.</p>
+    <button id="start" class="pri">Start a new game</button>
+    <div class="err" id="serr" role="alert"></div>
+  </section>
+</main>
+<script>
+{
+const $=s=>document.querySelector(s);
+const store={get(k){try{return localStorage.getItem(k)}catch{return null}},set(k,v){try{localStorage.setItem(k,v)}catch{}},keys(){try{return Object.keys(localStorage)}catch{return[]}}};
+
+$('#jf').addEventListener('submit',e=>{e.preventDefault();
+  let c=$('#code').value.trim().toUpperCase().replace(/\s+/g,'-');
+  if(/^[A-Z]{2,8}\d{2}$/.test(c))c=c.replace(/(\d{2})$/,'-$1');
+  if(!/^[A-Z]{2,8}-\d{2}$/.test(c)){$('#err').textContent='Codes look like WOLF-42: a word, a dash, two numbers.';return $('#code').focus()}
+  location.href='/s/'+c+'/'});
+
+$('#start').addEventListener('click',async()=>{const b=$('#start');b.disabled=true;$('#serr').textContent='';
+  try{const r=await fetch('/api/create',{method:'POST'});const j=await r.json();if(!r.ok)throw new Error(j.error||'Could not start a game');
+    store.set('dm-key-'+j.code,j.key);location.href='/s/'+j.code+'/dm?k='+encodeURIComponent(j.key)}
+  catch(e){$('#serr').textContent=e.message||String(e);b.disabled=false}});
+
+// games this browser started (the DM key is kept here)
+const mine=store.keys().filter(k=>k.startsWith('dm-key-')).map(k=>k.slice(7));
+if(mine.length){$('#resumeCard').hidden=false;
+  for(const c of mine){const a=document.createElement('a');a.href='/s/'+c+'/dm';a.textContent='Continue '+c;$('#resume').append(a)}}
+}
+</script>
+</body>
+</html>
