@@ -122,6 +122,48 @@ export class Session extends DurableObject {
     return m;
   }
 
+  // ---------------------------------------------------------------- table viewers
+  // The table screen gets its own view-only key and only the data it draws:
+  // map, combat, public dice rolls, the party, and the one handout on screen.
+  // Never the monster library, random tables, other handouts, secret rolls, players or chat.
+  tvFilter(path, data) {
+    if (data == null) return null;
+    if (path === "map/current" || path === "combat/current" || path.startsWith("heroes/")) return data;
+    if (path === "dice/log") return { ...data, rolls: (data.rolls || []).filter((r) => !r.secret) };
+    if (path.startsWith("handouts/")) {
+      const shown = (this.getDoc("map/current") || {}).handout;
+      return shown && path === "handouts/" + shown ? data : null;
+    }
+    return null;
+  }
+  tvDocs() {
+    const out = {};
+    const shown = (this.getDoc("map/current") || {}).handout;
+    for (const r of this.q(`SELECT path,data FROM docs`)) {
+      const d = this.tvFilter(r.path, JSON.parse(r.data));
+      if (d) out[r.path] = d;
+    }
+    if (shown) { const h = this.getDoc("handouts/" + shown); if (h) out["handouts/" + shown] = h; }
+    return out;
+  }
+  toTV(msg) {
+    for (const ws of this.ctx.getWebSockets("tv")) this.send(ws, msg);
+  }
+  tableKey() {
+    let k = this.meta("tableKey");
+    if (!k) { k = rid(12); this.setMeta("tableKey", k); }
+    return k;
+  }
+  tableOk(key) {
+    if (!this.keyHash || !key) return false;
+    const now = Date.now();
+    this.badKeys = this.badKeys.filter((t) => now - t < 600_000);
+    if (this.badKeys.length >= 20) return false;
+    const ok = same(String(key), this.tableKey());
+    if (!ok) this.badKeys.push(now);
+    return ok;
+  }
+
   // ---------------------------------------------------------------- auth
   async dmOk(key) {
     if (!this.keyHash || !key) return false;
@@ -223,6 +265,11 @@ export class Session extends DurableObject {
         return json({ ok: true });
       }
 
+      if (path === "/api/tstate") {
+        if (!this.tableOk(request.headers.get("X-Table-Key"))) { await sleep(400); return json({ error: "Not allowed" }, 403); }
+        return json({ docs: this.tvDocs(), code: this.code, title: this.meta("title") || "" });
+      }
+
       // ---- everything below is the DM only
       if (!(await this.dmOk(request.headers.get("X-DM-Key")))) {
         await sleep(400);
@@ -243,6 +290,14 @@ export class Session extends DurableObject {
         return json({ id, url: "/s/" + this.code + "/_blob/" + id });
       }
 
+      if (path === "/api/tablekey") return json({ key: this.tableKey() });
+      if (path === "/api/newtablekey" && request.method === "POST") {
+        const k = rid(12);
+        this.setMeta("tableKey", k);
+        for (const ws of this.ctx.getWebSockets("tv")) { try { ws.close(4002, "link replaced"); } catch {} }
+        return json({ key: k });
+      }
+
       const b = await request.json();
       if (path === "/api/set") {
         const p = String(b.path || "");
@@ -257,6 +312,14 @@ export class Session extends DurableObject {
           this.q(`INSERT INTO docs (path,data) VALUES (?,?) ON CONFLICT(path) DO UPDATE SET data=excluded.data`, p, s);
         }
         this.toDM({ type: "doc", path: p, data: data ?? null });
+        {
+          const f = this.tvFilter(p, data ?? null);
+          if (f || data == null) this.toTV({ type: "doc", path: p, data: f });
+          if (p === "map/current" && data && data.handout) {
+            const h = this.getDoc("handouts/" + data.handout);
+            if (h) this.toTV({ type: "doc", path: "handouts/" + data.handout, data: h });
+          }
+        }
         if (p.startsWith("heroes/")) {
           const hid = p.split("/")[1];
           for (const pl of this.q(`SELECT pid,char FROM players`)) {
@@ -274,7 +337,11 @@ export class Session extends DurableObject {
         return json({ ok: true, title });
       }
       if (path === "/api/emit") {
-        this.toDM({ type: "room", topic: String(b.topic || "").slice(0, 48), data: b.data, tab: b.tab });
+        const topic = String(b.topic || "").slice(0, 48);
+        this.toDM({ type: "room", topic, data: b.data, tab: b.tab });
+        if (["map", "combat", "roll", "ruler", "ping"].includes(topic) && !(b.data && b.data.secret)) {
+          this.toTV({ type: "room", topic, data: b.data, tab: b.tab });
+        }
         return json({ ok: true });
       }
       if (path === "/api/tell") {
@@ -307,9 +374,18 @@ export class Session extends DurableObject {
     const origin = request.headers.get("Origin");
     if (origin && new URL(origin).host !== new URL(request.url).host) return new Response("Wrong origin", { status: 403 });
     const protos = this.protocols(request);
+    const tvProto = protos.find((p) => p.startsWith("tv."));
     const dmProto = protos.find((p) => p.startsWith("dm."));
     const pProto = protos.find((p) => p.startsWith("p."));
 
+    if (tvProto) {
+      if (!this.tableOk(tvProto.slice(3))) return new Response("Not allowed", { status: 403 });
+      const [client, server] = Object.values(new WebSocketPair());
+      this.ctx.acceptWebSocket(server, ["tv"]);
+      this.send(server, { type: "sync", docs: this.tvDocs(), code: this.code, title: this.meta("title") || "" });
+      await this.touch();
+      return new Response(null, { status: 101, webSocket: client, headers: { "Sec-WebSocket-Protocol": tvProto } });
+    }
     if (dmProto) {
       if (!(await this.dmOk(dmProto.slice(3)))) return new Response("Not allowed", { status: 403 });
       const [client, server] = Object.values(new WebSocketPair());
