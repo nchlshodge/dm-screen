@@ -43,6 +43,8 @@ button.pri{background:var(--now);border-color:var(--now);color:#fff;font-size:18
   <section class="card">
     <h2>I'm the DM</h2>
     <p class="hint">Start a new game and get a code to share. Your players join from their own phones, anywhere.</p>
+    <label for="title" class="hint" style="display:block;margin:0">Game name (optional)</label>
+    <input id="title" maxlength="40" autocomplete="off" placeholder="Friday Night Quest" style="text-transform:none;letter-spacing:0;font-size:18px;margin-top:4px">
     <button id="start" class="pri">Start a new game</button>
     <div class="err" id="serr" role="alert"></div>
   </section>
@@ -59,14 +61,14 @@ $('#jf').addEventListener('submit',e=>{e.preventDefault();
   location.href='/s/'+c+'/'});
 
 $('#start').addEventListener('click',async()=>{const b=$('#start');b.disabled=true;$('#serr').textContent='';
-  try{const r=await fetch('/api/create',{method:'POST'});const j=await r.json();if(!r.ok)throw new Error(j.error||'Could not start a game');
-    store.set('dm-key-'+j.code,j.key);location.href='/s/'+j.code+'/dm?k='+encodeURIComponent(j.key)}
+  try{const r=await fetch('/api/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:$('#title').value})});const j=await r.json();if(!r.ok)throw new Error(j.error||'Could not start a game');
+    store.set('dm-key-'+j.code,j.key);store.set('dm-title-'+j.code,j.title||'');location.href='/s/'+j.code+'/dm?k='+encodeURIComponent(j.key)}
   catch(e){$('#serr').textContent=e.message||String(e);b.disabled=false}});
 
 // games this browser started (the DM key is kept here)
 const mine=store.keys().filter(k=>k.startsWith('dm-key-')).map(k=>k.slice(7));
 if(mine.length){$('#resumeCard').hidden=false;
-  for(const c of mine){const a=document.createElement('a');a.href='/s/'+c+'/dm';a.textContent='Continue '+c;$('#resume').append(a)}}
+  for(const c of mine){const a=document.createElement('a');a.href='/s/'+c+'/dm';a.textContent='Continue '+(store.get('dm-title-'+c)||c)+(store.get('dm-title-'+c)?' ('+c+')':'');$('#resume').append(a)}}
 }
 </script>
 </body>

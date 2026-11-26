@@ -735,6 +735,7 @@ function act(a,ds,el){
   case 'snew':return newScene();
   case 'sgo':if(ds.id)switchScene(ds.id);return;
   case 'sdel':if(ui.arm!=='sdel'+ds.id){ui.arm='sdel'+ds.id;return render()}ui.arm=null;delete S.scenes[ds.id];save('scenes/'+ds.id,null);return render();
+  case 'savetitle':lanPost('/api/title',{title:ui.tmp.gtitle??LAN.title}).then(j=>{setTitle(j.title);delete ui.tmp.gtitle;render();toast('Game name saved')}).catch(e=>toast(e.message));return;
   case 'copyjoin':case 'copydm':{const u=a==='copydm'?location.origin+BASE+'/dm?k='+encodeURIComponent(DMKEY||''):LAN.url;(navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(()=>toast(a==='copydm'?'DM link copied. Keep it private.':'Join link copied')).catch(()=>toast(u));return}
   case 'newcode':lanPost('/api/newcode',{}).then(j=>{LAN.code=j.code;render();toast('New code: '+j.code)}).catch(e=>toast(e.message));return;
   case 'psel':LAN.sel=ds.id;return render();
@@ -842,8 +843,9 @@ function startTable(){
   new ResizeObserver(()=>drawAll()).observe(document.getElementById('tbl'));drawAll()}
 
 // ---------------- local edition (players join on your Wi-Fi)
-const LAN={on:false,code:'',url:'',players:[],chat:[],sel:'all',unread:0};
+const LAN={on:false,code:'',title:'',url:'',players:[],chat:[],sel:'all',unread:0};
 const lanPost=(u,b)=>fetch(BASE+u,{method:'POST',headers:{'Content-Type':'application/json',...(OL&&DMKEY?{'X-DM-Key':DMKEY}:{})},body:JSON.stringify(b)}).then(async r=>{const j=await r.json().catch(()=>({}));if(!r.ok)throw{code:r.status>=500?'unavailable':'invalid_argument',message:j.error||('Server said '+r.status)};return j});
+function setTitle(t){LAN.title=String(t||'');document.title=(LAN.title?LAN.title+' · ':'')+'DM Screen';try{if(OL)localStorage.setItem('dm-title-'+OL,LAN.title)}catch{}}
 function savedMsg(){return OL?'Saved online':LAN.on?'Saved on this computer':'All changes saved'}
 // Both editions (this computer / online) talk through the same three interfaces. Only the way
 // messages travel differs: lanConnect() uses fetch + EventSource, onlineConnect() fetch + a WebSocket.
@@ -859,7 +861,8 @@ function makeAdapter(docs,upload){
   const feed=m=>{
     if(m.type==='doc'){if(m.data==null)delete docs[m.path];else docs[m.path]=m.data;notify(m.path)}
     else if(m.type==='room'){for(const f of roomL[m.topic]||[])f({topic:m.topic,data:m.data,sameTab:m.tab===tab,isMe:true})}
-    else if(m.type==='sync'){for(const k of Object.keys(docs))delete docs[k];Object.assign(docs,m.docs||{});LAN.code=m.code||LAN.code;LAN.players=m.players||[];LAN.chat=m.chat||[];
+    else if(m.type==='title'){setTitle(m.title);if(!TABLE&&ui.tab==='players')render()}
+    else if(m.type==='sync'){setTitle(m.title);for(const k of Object.keys(docs))delete docs[k];Object.assign(docs,m.docs||{});LAN.code=m.code||LAN.code;LAN.players=m.players||[];LAN.chat=m.chat||[];
       for(const x of subs)x.kind==='col'?x.cb(snapCol(x.name)):x.cb(snapDoc(x.name));if(!TABLE)render()}
     else lanEvent(m)};
   return{db,room,assets:{upload},feed}}
@@ -887,7 +890,7 @@ async function onlineConnect(){
   let r;try{r=await fetch(BASE+'/api/state',{headers:{'X-DM-Key':DMKEY},cache:'no-store'})}catch{throw new Error("Can't reach the DM Screen server. Check your internet.")}
   if(!r.ok)throw new Error(r.status===404?'That game no longer exists.':"That DM link doesn't work. Open the full link you got when you started the game.");
   const st=await r.json(),docs={};Object.assign(docs,st.docs||{});
-  LAN.code=st.code;LAN.url=location.origin+BASE+'/';LAN.players=st.players||[];LAN.chat=st.chat||[];
+  setTitle(st.title);LAN.code=st.code;LAN.url=location.origin+BASE+'/';LAN.players=st.players||[];LAN.chat=st.chat||[];
   const upload=async f=>{const r=await fetch(BASE+'/api/upload',{method:'POST',headers:{'Content-Type':f.type||'application/octet-stream','X-DM-Key':DMKEY},body:f});const j=await r.json().catch(()=>({}));if(!r.ok)throw{message:j.error||'Upload failed'};return j};
   const A=makeAdapter(docs,upload);
   let skipSync=true,retry=0,ping=null;
@@ -912,6 +915,7 @@ function vPlayers(){
   const bubble=m=>{const mine=m.from==='dm';return `<div class="bub ${mine?'me':''}"><div class="hint">${mine?`You → ${esc(pName(m.to))}`:esc(pName(m.from))} · ${esc(new Date(m.t).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}))}</div>${m.handout?`<div class="hcard">${m.handout.img?`<img src="${esc(blobSrc(m.handout.img))}" alt="">`:''}<b>${esc(m.handout.title||'Handout')}</b>${m.handout.text?`<div class="pre">${esc(m.handout.text)}</div>`:''}</div>`:''}${m.text?`<div class="pre">${esc(m.text)}</div>`:''}</div>`};
   return `<div class="two"><div>
   <div class="card joinc"><div><div class="hint">${OL?'Players open this on any phone or tablet, anywhere':'Players open this on a phone or tablet on your Wi-Fi'}</div><div class="jurl">${esc(LAN.url)}</div></div><div class="jcode"><div class="hint">Join code</div><b>${esc(LAN.code)}</b>${OL?'<button class="sm" data-a="copyjoin">Copy join link</button>':'<button class="sm" data-a="newcode">New code</button>'}</div></div>
+  ${OL?`<div class="grid2" style="grid-template-columns:minmax(0,1fr) auto;margin-top:8px;align-items:end"><div><label for="gtitle">Game name</label><input id="gtitle" data-tmp="1" maxlength="40" value="${esc(ui.tmp.gtitle??LAN.title)}" placeholder="Friday Night Quest" autocomplete="off"></div><button class="sm" data-a="savetitle">Save</button></div>`:''}
   ${OL?'<p class="hint" style="margin:8px 0 0">Your private DM link opens this game on another device. Keep it secret. <button class="sm" data-a="copydm">Copy DM link</button></p>':''}
   <div class="card" style="margin-top:16px"><div class="bar"><label for="psel" style="color:var(--ink);font-weight:700">Talking to</label><select id="psel" style="width:auto"><option value="all">Everyone</option>${ps.map(p=>`<option value="${p.pid}" ${sel===p.pid?'selected':''}>${esc(p.name)}${p.charName?' ('+esc(p.charName)+')':''}</option>`).join('')}</select></div>
    <div class="thread" id="pthread">${thread.length?thread.map(bubble).join(''):'<p class="hint">No messages yet. Messages you send only go to the player you pick.</p>'}</div>

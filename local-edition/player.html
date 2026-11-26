@@ -51,7 +51,7 @@ main{max-width:640px;margin:0 auto;padding:16px;display:grid;gap:14px}
 </head>
 <body>
 <div id="joinView" class="card join" hidden>
-  <h2>Join the game</h2>
+  <h2 id="jtitle">Join the game</h2>
   <p class="hint" id="jtext">Type your name and the 4 numbers on the DM's screen.</p>
   <form id="jf" novalidate>
     <label for="jname" class="hint" style="display:block;text-align:left">Your name</label>
@@ -106,6 +106,7 @@ $('#jf').addEventListener('submit',async e=>{e.preventDefault();const name=$('#j
   try{const j=await fetch(BASE+'/api/join',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(OLC?{name}:{name,code})});const r=await j.json();if(!j.ok)throw new Error(r.error||'Could not join');
     token=r.token;store.set(TK,token);store.set('dm-name',name);start()}catch(err){$('#jerr').textContent=err.message||String(err)}});
 if(OLC){$('#jtext').textContent='Type your name to join game '+OLC+'.';$('#jcode').hidden=true}
+function setTitle(t){t=String(t||'');document.title=t||'Join the Game';$('#jtitle').textContent=t?'Join '+t:'Join the game'}
 function showJoin(){$('#gameView').hidden=true;$('#joinView').hidden=false;(OLC||!$('#jname').value?$('#jname'):digits[0]).focus()}
 function leave(){if(es)es.close();es=null;token=null;store.set(TK,null);showJoin()}
 $('#leave').addEventListener('click',leave);
@@ -125,7 +126,8 @@ function start(){$('#joinView').hidden=true;$('#gameView').hidden=false;
   es.onopen=()=>{$('#conn').textContent='Connected'};
   es.onerror=async()=>{$('#conn').textContent='Reconnecting…';try{const r=await fetch(BASE+'/api/pcheck?token='+encodeURIComponent(token||''));if(r.status===401||r.status===404){leave();$('#jerr').textContent='The game restarted. Join again with the new code.'}}catch{}};
   es.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch{return}
-    if(m.type==='hello'){me={...me,...m};renderAll()}
+    if(m.type==='hello'){setTitle(m.title);me={...me,...m};renderAll()}
+    else if(m.type==='title')setTitle(m.title)
     else if(m.type==='msg'){me.messages.push(m.msg);renderMsgs(true);if(m.msg.from==='dm'&&navigator.vibrate)navigator.vibrate(120)}
     else if(m.type==='hero'){me.hero=m.hero;if('char' in m)me.char=m.char;renderMe()}
     else if(m.type==='heroes'){me.heroes=m.heroes;if(!me.char)renderMe()}
@@ -159,6 +161,7 @@ document.querySelectorAll('.dg button').forEach(b=>b.addEventListener('click',()
 $('#adv').addEventListener('click',()=>doRoll(20,'h'));$('#dis').addEventListener('click',()=>doRoll(20,'l'));
 
 // ---- boot
+if(OLC)fetch(BASE+'/api/info').then(r=>r.json()).then(j=>setTitle(j.title)).catch(()=>{});
 (async()=>{if(!token)return showJoin();try{const r=await fetch(BASE+'/api/pcheck?token='+encodeURIComponent(token));if(r.ok)return start()}catch{}leave()})();
 }
 </script>
