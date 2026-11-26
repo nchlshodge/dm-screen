@@ -1020,7 +1020,7 @@ function vMap(){
   const sc=Object.entries(S.scenes);if(S.map.sceneId&&!S.scenes[S.map.sceneId])sc.push([S.map.sceneId,sceneOf(S.map)]);if(!S.map.sceneId)sc.push(['',{name:S.map.name||'Map 1'}]);
   const fogT=ui.tool==='reveal'||ui.tool==='hide';
   return `<div class="two"><div><div class="bar tools2"><span class="grp">Fog</span>${tool('reveal','Reveal')}${tool('hide','Hide')}${tool('room','Room')}${tool('wall','Walls')}${tool('door','Doors')}</div>
-   <div class="bar tools2"><span class="grp">Play</span>${tool('move','Move')}${tool('measure','Measure')}${tool('draw','Draw')}${tool('ping','Ping')}</div>
+   <div class="bar tools2"><span class="grp">Play</span>${tool('move','Move')}${tool('measure','Measure')}${tool('draw','Draw')}${tool('ping','Ping')}<button class="sm ${m.grid?'on':''}" data-a="gridtog" aria-pressed="${!!m.grid}" title="Show or hide grid lines on the table screen">Table grid: ${m.grid?'On':'Off'}</button></div>
    <div class="bar sub">${fogT?`<select id="brush" data-tmp="1" style="width:auto" aria-label="Brush size"><option value="1">1 square</option><option value="2" ${ui.brush===2?'selected':''}>2×2</option><option value="3" ${ui.brush===3?'selected':''}>3×3</option><option value="5" ${ui.brush===5?'selected':''}>5×5</option></select>
    <button class="sm" data-a="fogall" data-v="1">Reveal all</button><button class="sm" data-a="fogall" data-v="0">Hide all</button>`:''}
    ${ui.tool==='door'?`<label style="display:flex;gap:6px;align-items:center;color:var(--ink)"><input type="checkbox" data-mc="autoDoor" style="width:auto" ${m.autoDoor!==false?'checked':''}> Opening a door reveals the room behind it</label>`:''}
@@ -1127,6 +1127,7 @@ function act(a,ds,el){
   case 'psend':{const t=String(ui.tmp.pmsg||'').trim();if(!t)return document.getElementById('pmsg')?.focus();lanPost('/api/tell',{to:LAN.sel,text:t}).then(()=>{ui.tmp.pmsg='';render();document.getElementById('pmsg')?.focus()}).catch(e=>toast(e.message));return}
   case 'phsend':{const id=ui.tmp.phand||Object.entries(S.handouts).sort((a,b)=>String(a[1].title).localeCompare(b[1].title))[0]?.[0],h=S.handouts[id];if(!h)return;lanPost('/api/tell',{to:LAN.sel,handout:{title:h.title,text:h.text,img:h.img}}).then(()=>toast('Handout sent to '+pName(LAN.sel))).catch(e=>toast(e.message));return}
   case 'pkick':if(ui.arm!=='pkick'+ds.id){ui.arm='pkick'+ds.id;return render()}ui.arm=null;if(LAN.sel===ds.id)LAN.sel='all';lanPost('/api/kick',{pid:ds.id}).catch(()=>{});return;
+  case 'gridtog':S.map.grid=!S.map.grid;saveMap();return render();
   case 'wx':S.map.weather=ds.w;saveMap();return render();
   case 'wallclear':if(ui.arm!=='wallclear'){ui.arm='wallclear';return render()}ui.arm=null;S.map.walls={};saveMap();return render();
   case 'amb':return toggleAmb(ds.k);
