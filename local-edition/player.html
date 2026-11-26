@@ -52,11 +52,11 @@ main{max-width:640px;margin:0 auto;padding:16px;display:grid;gap:14px}
 <body>
 <div id="joinView" class="card join" hidden>
   <h2>Join the game</h2>
-  <p class="hint">Type your name and the 4 numbers on the DM's screen.</p>
+  <p class="hint" id="jtext">Type your name and the 4 numbers on the DM's screen.</p>
   <form id="jf" novalidate>
     <label for="jname" class="hint" style="display:block;text-align:left">Your name</label>
     <input id="jname" maxlength="24" autocomplete="nickname" required>
-    <div class="code" role="group" aria-label="Join code">
+    <div class="code" id="jcode" role="group" aria-label="Join code">
       <input inputmode="numeric" maxlength="1" aria-label="Digit 1"><input inputmode="numeric" maxlength="1" aria-label="Digit 2"><input inputmode="numeric" maxlength="1" aria-label="Digit 3"><input inputmode="numeric" maxlength="1" aria-label="Digit 4">
     </div>
     <div class="err" id="jerr" role="alert"></div>
@@ -89,8 +89,10 @@ const num=(v,d=0)=>{const n=parseFloat(v);return Number.isFinite(n)?n:d};
 const mod=s=>Math.floor((num(s,10)-10)/2),sg=n=>(n>=0?'+':'')+n;
 const ORD=['1st','2nd','3rd','4th','5th','6th','7th','8th','9th'];
 const store={get(k){try{return localStorage.getItem(k)}catch{return null}},set(k,v){try{v==null?localStorage.removeItem(k):localStorage.setItem(k,v)}catch{}}};
-let token=store.get('dm-token'),me={name:'',char:null,hero:null,heroes:[],messages:[]},es=null;
-const post=(u,b)=>fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}).then(async r=>{const j=await r.json().catch(()=>({}));if(r.status===401){leave();throw new Error('Please join again')}if(!r.ok)throw new Error(j.error||'Something went wrong');return j});
+// Online games live at /s/<CODE>/ and use one WebSocket; the Local Edition uses plain /play and server-sent events.
+const OLC=(location.pathname.match(/^\/s\/([A-Z]{2,8}-\d{2})\/?$/)||[])[1]||null,BASE=OLC?'/s/'+OLC:'',TK=OLC?'dm-token-'+OLC:'dm-token';
+let token=store.get(TK),me={name:'',char:null,hero:null,heroes:[],messages:[]},es=null;
+const post=(u,b)=>fetch(BASE+u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}).then(async r=>{const j=await r.json().catch(()=>({}));if(r.status===401){leave();throw new Error('Please join again')}if(!r.ok)throw new Error(j.error||'Something went wrong');return j});
 
 // ---- join
 const digits=[...document.querySelectorAll('.code input')];
@@ -98,20 +100,30 @@ digits.forEach((d,i)=>{d.addEventListener('input',()=>{d.value=d.value.replace(/
   d.addEventListener('keydown',e=>{if(e.key==='Backspace'&&!d.value&&digits[i-1])digits[i-1].focus()});
   d.addEventListener('paste',e=>{const t=(e.clipboardData.getData('text')||'').replace(/\D/g,'').slice(0,4);if(t.length===4){e.preventDefault();t.split('').forEach((c,k)=>digits[k].value=c);digits[3].focus()}})});
 $('#jname').value=store.get('dm-name')||'';
-$('#jf').addEventListener('submit',async e=>{e.preventDefault();const name=$('#jname').value.trim(),code=digits.map(d=>d.value).join('');
+$('#jf').addEventListener('submit',async e=>{e.preventDefault();const name=$('#jname').value.trim(),code=OLC?'':digits.map(d=>d.value).join('');
   if(!name){$('#jerr').textContent='Type your name first.';return $('#jname').focus()}
-  if(code.length<4){$('#jerr').textContent='The code has 4 numbers.';return digits.find(d=>!d.value).focus()}
-  try{const j=await fetch('/api/join',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,code})});const r=await j.json();if(!j.ok)throw new Error(r.error||'Could not join');
-    token=r.token;store.set('dm-token',token);store.set('dm-name',name);start()}catch(err){$('#jerr').textContent=err.message||String(err)}});
-function showJoin(){$('#gameView').hidden=true;$('#joinView').hidden=false;($('#jname').value?digits[0]:$('#jname')).focus()}
-function leave(){if(es)es.close();es=null;token=null;store.set('dm-token',null);showJoin()}
+  if(!OLC&&code.length<4){$('#jerr').textContent='The code has 4 numbers.';return digits.find(d=>!d.value).focus()}
+  try{const j=await fetch(BASE+'/api/join',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(OLC?{name}:{name,code})});const r=await j.json();if(!j.ok)throw new Error(r.error||'Could not join');
+    token=r.token;store.set(TK,token);store.set('dm-name',name);start()}catch(err){$('#jerr').textContent=err.message||String(err)}});
+if(OLC){$('#jtext').textContent='Type your name to join game '+OLC+'.';$('#jcode').hidden=true}
+function showJoin(){$('#gameView').hidden=true;$('#joinView').hidden=false;(OLC||!$('#jname').value?$('#jname'):digits[0]).focus()}
+function leave(){if(es)es.close();es=null;token=null;store.set(TK,null);showJoin()}
 $('#leave').addEventListener('click',leave);
 
 // ---- game
+function openStream(){
+  if(!OLC)return new EventSource('/api/pevents?token='+encodeURIComponent(token));
+  const h={close(){h.dead=true;clearInterval(h.ping);try{h.ws&&h.ws.close()}catch{}}};let retry=0;
+  const go=()=>{if(h.dead)return;
+    const ws=h.ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host+BASE+'/ws',['p.'+token]);
+    ws.onopen=()=>{retry=0;clearInterval(h.ping);h.ping=setInterval(()=>{try{ws.send('ping')}catch{}},25000);h.onopen&&h.onopen()};
+    ws.onmessage=e=>{if(e.data!=='pong'&&h.onmessage)h.onmessage(e)};
+    ws.onclose=()=>{clearInterval(h.ping);if(h.dead)return;h.onerror&&h.onerror();setTimeout(go,Math.min(10000,1000*2**retry++))}};
+  setTimeout(go);return h}
 function start(){$('#joinView').hidden=true;$('#gameView').hidden=false;
-  if(es)es.close();es=new EventSource('/api/pevents?token='+encodeURIComponent(token));
+  if(es)es.close();es=openStream();
   es.onopen=()=>{$('#conn').textContent='Connected'};
-  es.onerror=async()=>{$('#conn').textContent='Reconnecting…';try{const r=await fetch('/api/pcheck?token='+encodeURIComponent(token||''));if(r.status===401){leave();$('#jerr').textContent='The game restarted. Join again with the new code.'}}catch{}};
+  es.onerror=async()=>{$('#conn').textContent='Reconnecting…';try{const r=await fetch(BASE+'/api/pcheck?token='+encodeURIComponent(token||''));if(r.status===401||r.status===404){leave();$('#jerr').textContent='The game restarted. Join again with the new code.'}}catch{}};
   es.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch{return}
     if(m.type==='hello'){me={...me,...m};renderAll()}
     else if(m.type==='msg'){me.messages.push(m.msg);renderMsgs(true);if(m.msg.from==='dm'&&navigator.vibrate)navigator.vibrate(120)}
@@ -132,7 +144,7 @@ function renderMe(){const h=me.hero,c=$('#meCard');$('#hname').textContent=h&&h.
     <p class="hint" style="margin-top:10px"><button data-c="" style="min-height:34px;font-size:14px">Change character</button></p>`}
 $('#meCard').addEventListener('click',e=>{const b=e.target.closest('[data-c]');if(!b)return;post('/api/pchar',{token,char:b.dataset.c||null}).catch(err=>alertMsg(err.message))});
 function renderMsgs(scroll){const t=$('#thread'),list=me.messages||[];
-  t.innerHTML=list.length?list.map(m=>{const mine=m.from!=='dm';return `<div class="bub ${mine?'me':''}"><div class="hint">${mine?'You':'DM'}${m.to==='all'&&!mine?' · to everyone':''}</div>${m.handout?`<div class="hcard">${m.handout.img?`<img src="/_blob/${encodeURIComponent(m.handout.img)}" alt="">`:''}<b>${esc(m.handout.title||'Handout')}</b>${m.handout.text?`<div class="pre">${esc(m.handout.text)}</div>`:''}</div>`:''}${m.text?`<div class="pre">${esc(m.text)}</div>`:''}</div>`}).join(''):'<p class="hint">Nothing yet. Secret notes from the DM show up here.</p>';
+  t.innerHTML=list.length?list.map(m=>{const mine=m.from!=='dm';return `<div class="bub ${mine?'me':''}"><div class="hint">${mine?'You':'DM'}${m.to==='all'&&!mine?' · to everyone':''}</div>${m.handout?`<div class="hcard">${m.handout.img?`<img src="${BASE}/_blob/${encodeURIComponent(m.handout.img)}" alt="">`:''}<b>${esc(m.handout.title||'Handout')}</b>${m.handout.text?`<div class="pre">${esc(m.handout.text)}</div>`:''}</div>`:''}${m.text?`<div class="pre">${esc(m.text)}</div>`:''}</div>`}).join(''):'<p class="hint">Nothing yet. Secret notes from the DM show up here.</p>';
   t.scrollTop=t.scrollHeight}
 $('#sf').addEventListener('submit',e=>{e.preventDefault();const v=$('#say').value.trim();if(!v)return;post('/api/psay',{token,text:v}).then(()=>{$('#say').value=''}).catch(err=>alertMsg(err.message))});
 function alertMsg(t){$('#rlab').textContent=t}
@@ -147,7 +159,7 @@ document.querySelectorAll('.dg button').forEach(b=>b.addEventListener('click',()
 $('#adv').addEventListener('click',()=>doRoll(20,'h'));$('#dis').addEventListener('click',()=>doRoll(20,'l'));
 
 // ---- boot
-(async()=>{if(!token)return showJoin();try{const r=await fetch('/api/pcheck?token='+encodeURIComponent(token));if(r.ok)return start()}catch{}leave()})();
+(async()=>{if(!token)return showJoin();try{const r=await fetch(BASE+'/api/pcheck?token='+encodeURIComponent(token));if(r.ok)return start()}catch{}leave()})();
 }
 </script>
 </body>
