@@ -495,7 +495,7 @@ function rowH(r,i){
    ${extra?`<div class="extra">${extra}</div>`:''}</li>`}
 
 const HF=[['name','Name','text'],['player','Player','text'],['race','Species','text'],['cls','Class','text'],['level','Level','number'],['ac','AC','number'],['hpMax','Max HP','number'],['hp','Current HP','number'],['speed','Speed','number'],['initBonus','Initiative bonus','number','uses DEX'],['saveDC','Spell save DC','number'],['spellAtk','Spell attack bonus','number']];
-const HT=[['cantrips','Cantrips','One per line'],['spells','Spells known or prepared','One per line'],['attacks','Weapons and attacks','Longsword +5, 1d8+3 slashing'],['features','Features and traits',''],['gear','Equipment',''],['notes','Notes','']];
+const HT=[['cantrips','Cantrips','One per line'],['spells','Spells known or prepared','One per line'],['attacks','Weapons and attacks','Longsword +5, 1d8+3 slashing'],['features','Features and traits',''],['magic','Magic items and effects (players see this)','Cloak of Protection: +1 AC and saves. Blessed by the river spirit until dawn.'],['gear','Equipment',''],['notes','Notes (not shown on the player sheet)','']];
 const MF=[['name','Name','text'],['cr','CR','text'],['ac','AC','number'],['hp','Average HP','number'],['hpDice','HP dice','text','2d6'],['speed','Speed','text']];
 const MT=[['attacks','Actions and attacks',''],['traits','Traits and notes','']];
 function field([f,l,t,ph],o){return `<div><label for="f-${f}">${l}</label><input id="f-${f}" data-f="${f}" type="${t}" value="${esc(o[f]??'')}" ${ph?`placeholder="${esc(ph)}"`:''}></div>`}
