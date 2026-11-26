@@ -40,6 +40,7 @@ npm test             # in a second terminal: BASE=http://localhost:<port> npm te
 - `npm run sync` (runs before `dev` and `deploy`) copies `web/index.html` and `local-edition/player.html` into `public/`, so there is one source for every edition.
 - The DM link carries a secret key (`?k=...`). The page saves it in the browser and removes it from the address bar. Only a hash of the key is stored on the server. Use **Copy DM link** on the Players tab to open the game on another device.
 - The table link (Map tab, Table screen setup) has its own view-only key. It receives only the map, combat, public dice rolls, the party and the handout on screen: never the monster library, secret rolls, chat or players. "Make a new link" replaces it.
+- Characters can be saved to a file and loaded into any edition (Party tab, **Move characters**). Imported files are cleaned and always add new characters; they never overwrite existing ones.
 - Players get a token when they join and can only see their own sheet and messages.
 - A game nobody touches for 30 days is deleted with its pictures. Pictures: images only, 10 MB each.
 

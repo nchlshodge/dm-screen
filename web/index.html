@@ -208,6 +208,35 @@ async function flush(path){
 const pending=p=>(p in pend)||busy[p];
 function saveLocal(){try{const m=clone(S.map);if(m.img&&String(m.img).startsWith('blob:'))m.img=null;localStorage.setItem('dm-screen-v1',JSON.stringify({heroes:S.heroes,monsters:S.monsters,tables:S.tables,handouts:S.handouts,scenes:S.scenes,dice:S.dice,combat:S.combat,map:m}))}catch{}setStatus('Saved in this browser only')}
 const saveHero=id=>S.heroes[id]&&save('heroes/'+id,S.heroes[id]);
+// ---- move characters between editions (hosted page, Local Edition, online game) as a JSON file
+function downloadJson(name,obj){const a=document.createElement('a'),u=URL.createObjectURL(new Blob([JSON.stringify(obj,null,2)],{type:'application/json'}));a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),2000)}
+function exportHeroes(ids){const list=ids.map(id=>S.heroes[id]).filter(Boolean).map(h=>clone(h));if(!list.length)return toast('No characters to export yet.');
+  downloadJson(list.length===1?String(list[0].name||'character').replace(/[^\w -]+/g,'').trim().replace(/\s+/g,'-').toLowerCase()+'.json':'dm-screen-characters.json',{app:'dm-screen',type:'characters',version:1,exported:new Date().toISOString(),heroes:list});
+  toast(`Exported ${list.length} character${list.length===1?'':'s'}`)}
+// Imported files are not trusted: keep plain values only, cap sizes, and always make new ids (never overwrites anyone).
+function cleanHero(raw){
+  if(!raw||typeof raw!=='object'||Array.isArray(raw))return null;
+  const o={};
+  for(const [k,v] of Object.entries(raw)){
+    if(!/^[A-Za-z][A-Za-z0-9_]{0,24}$/.test(k)||k==='constructor'||k==='prototype'||k==='img')continue;
+    if(typeof v==='string')o[k]=v.slice(0,6000);
+    else if(typeof v==='number'&&Number.isFinite(v))o[k]=v;
+    else if(typeof v==='boolean')o[k]=v}
+  o.name=String(o.name||'').trim().slice(0,60)||'Imported character';
+  o.slots=normSlots(raw.slots);
+  const d=raw.ds&&typeof raw.ds==='object'?raw.ds:{};o.ds={s:Math.max(0,Math.min(3,num(d.s))),f:Math.max(0,Math.min(3,num(d.f)))};
+  return o}
+async function importHeroes(file){
+  try{
+    if(file.size>2*1024*1024)throw new Error('That file is too big to be a character file.');
+    const j=JSON.parse(await file.text(),(k,v)=>k==='__proto__'?undefined:v);
+    const arr=Array.isArray(j)?j:Array.isArray(j&&j.heroes)?j.heroes:j&&typeof j==='object'&&j.name?[j]:null;
+    if(!arr||!arr.length)throw new Error('This file has no characters in it.');
+    if(j&&!Array.isArray(j)&&j.type&&j.type!=='characters')throw new Error('This file is not a DM Screen character file.');
+    let n=0,skipped=0;
+    for(const raw of arr.slice(0,50)){const h=cleanHero(raw);if(!h){skipped++;continue}const id=uid();S.heroes[id]=h;saveHero(id);n++}
+    render();toast(n?`Imported ${n} character${n===1?'':'s'}${skipped||arr.length>50?' (some were skipped)':''}`:'Nothing could be imported from that file.')
+  }catch(e){toast(e instanceof SyntaxError?"That file isn't a character file.":(e.message||String(e)))}}
 const saveMon=id=>S.monsters[id]&&save('monsters/'+id,S.monsters[id]);
 let lastEmit=0,emitT=null;
 const SCENE_KEYS=['name','img','cols','rows','fogOn','fog','tokens','draw','auras','walls','weather'];
@@ -487,7 +516,7 @@ function vEdit(kind){
       <button class="sm" data-a="fill" style="margin-top:8px">Fill from class and level</button> <span class="hint" id="fillmsg"></span></fieldset>`:''}
       <fieldset class="fs"><legend>${hero?'Spells, attacks and notes':'Actions'}</legend><div style="display:grid;gap:10px">${(hero?HT:MT).map(f=>area(f,o)).join('')}</div></fieldset></div>`}
   else edH=`<div class="empty"><h3>${items.length?'Pick one to edit':hero?'No characters yet':'No monsters yet'}</h3><p>${hero?'Add each player character from their sheet. Changes save as you type.':'Add a stat block once, then drop as many as you need into a fight.'}</p><button class="pri" data-a="new" data-k="${kind}">${hero?'Add character':'Add monster'}</button></div>`;
-  return `<div class="two" style="grid-template-columns:300px minmax(0,1fr)"><div><div class="bar"><h2 style="font-size:22px;margin-right:auto">${hero?'Party':'Monsters'}</h2><button class="sm pri" data-a="new" data-k="${kind}">${hero?'Add character':'Add monster'}</button></div><input id="esearch" data-tmp="1" type="search" placeholder="${hero?'Search the party':'Search name, CR 1/4, undead…'}" value="${tmpv('esearch')}" autocomplete="off" aria-label="Search" style="margin-bottom:8px"><div class="list" id="elist">${list}</div></div>${edH}</div>`}
+  return `<div class="two" style="grid-template-columns:300px minmax(0,1fr)"><div><div class="bar"><h2 style="font-size:22px;margin-right:auto">${hero?'Party':'Monsters'}</h2><button class="sm pri" data-a="new" data-k="${kind}">${hero?'Add character':'Add monster'}</button></div><input id="esearch" data-tmp="1" type="search" placeholder="${hero?'Search the party':'Search name, CR 1/4, undead…'}" value="${tmpv('esearch')}" autocomplete="off" aria-label="Search" style="margin-bottom:8px"><div class="list" id="elist">${list}</div>${hero?`<details style="margin-top:12px"><summary><b>Move characters</b></summary><p class="hint">Save your party to a file and load it into another DM Screen: this page, the Local Edition or an online game.</p><div class="bar"><button class="sm" data-a="charexp">Export everyone</button>${o?`<button class="sm" data-a="charexp1">Export ${esc(o.name||'this one')}</button>`:''}</div><label for="charfile" style="margin-top:8px">Import from a file</label><input type="file" id="charfile" accept=".json,application/json"></details>`:''}</div>${edH}</div>`}
 const mMatch=(c,q)=>{q=String(q||'').trim().toLowerCase();if(!q)return true;const cr=String(c.cr??'').toLowerCase();if(/^cr\s*/.test(q))return cr===q.replace(/^cr\s*/,'');return [c.name,c.cls,c.race,c.player,c.attacks,c.traits].some(v=>String(v||'').toLowerCase().includes(q))||cr===q};
 const monSorted=()=>Object.entries(S.monsters).sort((a,b)=>String(a[1].name).localeCompare(b[1].name));
 function monOpts(){const q=ui.tmp.addms,list=monSorted().filter(([,m])=>mMatch(m,q));if(list.length&&!list.some(([id])=>id===ui.tmp.addm))ui.tmp.addm=list[0][0];
@@ -737,6 +766,8 @@ function act(a,ds,el){
   case 'sgo':if(ds.id)switchScene(ds.id);return;
   case 'sdel':if(ui.arm!=='sdel'+ds.id){ui.arm='sdel'+ds.id;return render()}ui.arm=null;delete S.scenes[ds.id];save('scenes/'+ds.id,null);return render();
   case 'savetitle':lanPost('/api/title',{title:ui.tmp.gtitle??LAN.title}).then(j=>{setTitle(j.title);delete ui.tmp.gtitle;render();toast('Game name saved')}).catch(e=>toast(e.message));return;
+  case 'charexp':return exportHeroes(Object.keys(S.heroes));
+  case 'charexp1':return exportHeroes(ui.edit&&ui.edit.kind==='hero'?[ui.edit.id]:[]);
   case 'copytable':(navigator.clipboard?navigator.clipboard.writeText(LAN.tableLink):Promise.reject()).then(()=>toast('Table link copied')).catch(()=>toast(LAN.tableLink));return;
   case 'newtable':if(ui.arm!=='newtable'){ui.arm='newtable';return render()}ui.arm=null;fetch(BASE+'/api/newtablekey',{method:'POST',headers:{'X-DM-Key':DMKEY}}).then(r=>r.json()).then(j=>{LAN.tableLink=location.origin+BASE+'/table?t='+encodeURIComponent(j.key);render();toast('New table link ready')}).catch(()=>toast('Could not make a new link'));return;
   case 'copyjoin':case 'copydm':{const u=a==='copydm'?location.origin+BASE+'/dm?k='+encodeURIComponent(DMKEY||''):LAN.url;(navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(()=>toast(a==='copydm'?'DM link copied. Keep it private.':'Join link copied')).catch(()=>toast(u));return}
@@ -779,6 +810,7 @@ document.addEventListener('change',e=>{const t=e.target;
   if(t.dataset.rem){S.map.rem={...defMap().rem,...(S.map.rem||{}),[t.dataset.rem]:t.checked};saveMap();return render()}
   if(t.id==='lvhow')return render();
   if(t.dataset.t){S.map.table[t.dataset.t]=num(t.value);saveMap();return}
+  if(t.id==='charfile'&&t.files&&t.files[0]){const f=t.files[0];t.value='';importHeroes(f);return}
   if(t.id==='mapfile'&&t.files&&t.files[0])uploadMap(t.files[0]);
   if(t.id==='hfile'&&t.files&&t.files[0])uploadHandout(t.files[0]);
   if(t.id==='musicfile'&&t.files&&t.files.length){for(const f of t.files)snd.list.push({name:f.name.replace(/\.[^.]+$/,''),url:URL.createObjectURL(f)});if(snd.idx<0)playTrack(0);return render()}
@@ -962,7 +994,7 @@ async function boot(){
   const done=()=>{clearTimeout(loadTimer);if(!readOnly&&!Object.keys(pend).length)setStatus(TABLE?'':savedMsg());if(readOnly)setStatus('View only: you can look but not change things')};
   const onErr=e=>{clearTimeout(loadTimer);setStatus('Lost the connection to your saved game. Reload the page.')};
   const col=name=>db.collection(name).onSnapshot(snap=>{const m={};for(const d of snap.docs){const p=name+'/'+d.id;if(pending(p)){if(S[name][d.id])m[d.id]=S[name][d.id]}else m[d.id]=clone(d.data())}
-      for(const id in S[name])if(!m[id]&&(name+'/'+id) in pend&&pend[name+'/'+id]!==null)m[id]=S[name][id];
+      for(const id in S[name])if(!m[id]&&(((name+'/'+id) in pend&&pend[name+'/'+id]!==null)||busy[name+'/'+id]))m[id]=S[name][id];
       if(JSON.stringify(m)!==JSON.stringify(S[name])){S[name]=m;render()}if(!snap.metadata.fromCache)done()},onErr);
   col('heroes');col('monsters');col('tables');col('handouts');col('scenes');
   db.doc('dice/log').onSnapshot(s=>{if(!pending('dice/log')&&s.exists){const c=clone(s.data());if(JSON.stringify(c)!==JSON.stringify(S.dice)){S.dice={rolls:[],...c};const r=(S.dice.rolls||[])[0];if(TABLE&&r&&(!lastRoll||r.id!==lastRoll.id)){lastRoll=r;setTimeout(renderOverlay,9100)}if(ui.tab==='dice'||TABLE)render()}}},onErr);
