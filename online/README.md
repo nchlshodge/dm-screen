@@ -32,12 +32,14 @@ npm test             # in a second terminal: BASE=http://localhost:<port> npm te
 | --- | --- |
 | `/` | Landing page: join with a code, or start a game |
 | `/s/<CODE>/` | Player page (`local-edition/player.html`) |
-| `/s/<CODE>/dm` | DM page (`web/index.html`); also `#table` for the projector |
+| `/s/<CODE>/dm` | DM page (`web/index.html`); `#table` opens the table on the DM's own computer |
+| `/s/<CODE>/table?t=<KEY>` | View-only table screen for a projector or TV computer, with its own key |
 | `/s/<CODE>/api/*`, `/s/<CODE>/ws` | Game API and live connection (the `Session` object) |
 | `/s/<CODE>/_blob/<id>` | Pictures from R2 |
 
 - `npm run sync` (runs before `dev` and `deploy`) copies `web/index.html` and `local-edition/player.html` into `public/`, so there is one source for every edition.
 - The DM link carries a secret key (`?k=...`). The page saves it in the browser and removes it from the address bar. Only a hash of the key is stored on the server. Use **Copy DM link** on the Players tab to open the game on another device.
+- The table link (Map tab, Table screen setup) has its own view-only key. It receives only the map, combat, public dice rolls, the party and the handout on screen: never the monster library, secret rolls, chat or players. "Make a new link" replaces it.
 - Players get a token when they join and can only see their own sheet and messages.
 - A game nobody touches for 30 days is deleted with its pictures. Pictures: images only, 10 MB each.
 

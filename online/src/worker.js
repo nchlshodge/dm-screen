@@ -3,6 +3,7 @@
 //   /api/create          POST: make a new session, returns { code, key }
 //   /s/<CODE>/           player page
 //   /s/<CODE>/dm         DM page (the DM key travels in ?k= once, then lives in the browser)
+//   /s/<CODE>/table      view-only table screen for a projector (its own key, ?t=)
 //   /s/<CODE>/api/*      the game API   (handled by the Session object)
 //   /s/<CODE>/ws         live connection (handled by the Session object)
 //   /s/<CODE>/_blob/<id> pictures from R2
@@ -68,7 +69,7 @@ export default {
       if (m[1] !== code) return Response.redirect(url.origin + "/s/" + code + rest + url.search, 302);
 
       if (rest === "/") return asset(env, request, "/play.html");
-      if (rest === "/dm" || rest === "/dm/") return asset(env, request, "/dm.html");
+      if (rest === "/dm" || rest === "/dm/" || rest === "/table" || rest === "/table/") return asset(env, request, "/dm.html");
 
       if (rest.startsWith("/_blob/")) {
         const id = decodeURIComponent(rest.slice(7)).replace(/[^A-Za-z0-9._-]/g, "");

@@ -169,11 +169,12 @@ const normSlots=s=>Array.from({length:9},(_,i)=>({max:num(s&&s[i]&&s[i].max),use
 const prof=l=>2+Math.floor((Math.max(1,num(l,1))-1)/4);
 
 // ---------------- state
-const TABLE=location.hash==='#table';
-// Online edition: this page was opened at /s/<CODE>/dm on the DM Screen server.
-const OL=(location.pathname.match(/^\/s\/([A-Z]{2,8}-\d{2})\/dm\/?$/)||[])[1]||null;
+// Online edition: this page was opened at /s/<CODE>/dm (DM) or /s/<CODE>/table (view-only projector link).
+const OLM=location.pathname.match(/^\/s\/([A-Z]{2,8}-\d{2})\/(dm|table)\/?$/)||[];
+const OL=OLM[1]||null,VIEWER=OLM[2]==='table';
+const TABLE=location.hash==='#table'||VIEWER;
 const BASE=OL?'/s/'+OL:'';
-let DMKEY=null;
+let DMKEY=null,TVKEY=null;
 const defMap=()=>({img:null,name:'Map 1',sceneId:null,cols:24,rows:18,fogOn:true,fog:'',tokens:{},draw:[],auras:{},walls:{},weather:'none',autoDoor:true,showTokens:true,monBars:false,grid:false,table:{zoom:100,dx:0,dy:0,rot:0},rem:{order:true,turn:true,rolls:false,conds:true,dice:true},card:null,handout:null});
 // ---------------- rules reminders (plain-language summaries)
 const COND_TXT={Blinded:"Can't see. Attacks against it have advantage; its attacks have disadvantage.",Charmed:"Can't attack the one who charmed it.",Concentrating:"If hit, make a CON save (DC 10, or half the damage if higher) or the spell ends.",Deafened:"Can't hear.",Exhaustion:"Each level makes d20 rolls harder. Check the rules for the level.",Frightened:"Disadvantage on attacks and checks while the scary thing is in sight. Can't move closer to it.",Grappled:"Speed is 0.",Incapacitated:"No actions, bonus actions or reactions.",Invisible:"Attacks against it have disadvantage; its attacks have advantage.",Paralyzed:"Can't move or act. Attacks against it have advantage, and hits from 5 feet are critical hits.",Petrified:"Turned to stone. Can't move or act.",Poisoned:"Disadvantage on attack rolls and ability checks.",Prone:"On the ground. Its attacks have disadvantage. Close attacks against it have advantage, far ones disadvantage. Standing up costs half its speed.",Restrained:"Speed 0. Attacks against it have advantage; its attacks have disadvantage.",Stunned:"Can't move or act. Attacks against it have advantage.",Unconscious:"Drops what it holds and falls prone. Attacks against it have advantage, and hits from 5 feet are critical hits."};
@@ -662,7 +663,7 @@ function vMap(){
    <p class="hint">Match these to the grid printed on your map so the squares line up.</p>
    <label style="display:flex;gap:8px;align-items:center;color:var(--ink)"><input type="checkbox" data-mc="fogOn" style="width:auto" ${m.fogOn?'checked':''}> Fog of war</label></section>
   <section><details id="dt-table"><summary><b>Table screen setup</b></summary>
-   <p class="hint">${LAN.on?`Open <span class="code">${esc(OL?location.origin+BASE+'/dm#table':location.origin+'/#table')}</span> in a <b>new browser window</b>`:`Open this page's link in a <b>new browser window</b>, add <span class="code">#table</span> to the end of the address`}, drag that window onto the projector or TV, and press its Full screen button.</p>
+   ${OL&&LAN.tableLink?`<p class="hint">Open this link in a browser on the projector or TV computer, then press its Full screen button. It only shows the table, so it is safe to share with that screen.</p><p class="hint"><span class="code" style="word-break:break-all">${esc(LAN.tableLink)}</span></p><p><button class="sm" data-a="copytable">Copy table link</button> <button class="sm" data-a="newtable">${ui.arm==='newtable'?'Sure? The old link stops working':'Make a new link'}</button></p><p class="hint">Same computer as this one? Open <span class="code">${esc(location.origin+BASE+'/dm#table')}</span> in a new window instead.</p>`:`<p class="hint">${LAN.on?`Open <span class="code">${esc(location.origin+'/#table')}</span> in a <b>new browser window</b>`:`Open this page's link in a <b>new browser window</b>, add <span class="code">#table</span> to the end of the address`}, drag that window onto the projector or TV, and press its Full screen button.</p>`}
    <label style="display:flex;gap:8px;align-items:center;color:var(--ink)"><input type="checkbox" data-mc="showTokens" style="width:auto" ${m.showTokens?'checked':''}> Show tokens (turn off for real minis)</label>
    <label style="display:flex;gap:8px;align-items:center;color:var(--ink);margin-top:4px"><input type="checkbox" data-mc="monBars" style="width:auto" ${m.monBars?'checked':''}> Show monster health bars</label>
    <label style="display:flex;gap:8px;align-items:center;color:var(--ink);margin-top:4px"><input type="checkbox" data-mc="grid" style="width:auto" ${m.grid?'checked':''}> Show grid lines</label>
@@ -736,6 +737,8 @@ function act(a,ds,el){
   case 'sgo':if(ds.id)switchScene(ds.id);return;
   case 'sdel':if(ui.arm!=='sdel'+ds.id){ui.arm='sdel'+ds.id;return render()}ui.arm=null;delete S.scenes[ds.id];save('scenes/'+ds.id,null);return render();
   case 'savetitle':lanPost('/api/title',{title:ui.tmp.gtitle??LAN.title}).then(j=>{setTitle(j.title);delete ui.tmp.gtitle;render();toast('Game name saved')}).catch(e=>toast(e.message));return;
+  case 'copytable':(navigator.clipboard?navigator.clipboard.writeText(LAN.tableLink):Promise.reject()).then(()=>toast('Table link copied')).catch(()=>toast(LAN.tableLink));return;
+  case 'newtable':if(ui.arm!=='newtable'){ui.arm='newtable';return render()}ui.arm=null;fetch(BASE+'/api/newtablekey',{method:'POST',headers:{'X-DM-Key':DMKEY}}).then(r=>r.json()).then(j=>{LAN.tableLink=location.origin+BASE+'/table?t='+encodeURIComponent(j.key);render();toast('New table link ready')}).catch(()=>toast('Could not make a new link'));return;
   case 'copyjoin':case 'copydm':{const u=a==='copydm'?location.origin+BASE+'/dm?k='+encodeURIComponent(DMKEY||''):LAN.url;(navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(()=>toast(a==='copydm'?'DM link copied. Keep it private.':'Join link copied')).catch(()=>toast(u));return}
   case 'newcode':lanPost('/api/newcode',{}).then(j=>{LAN.code=j.code;render();toast('New code: '+j.code)}).catch(e=>toast(e.message));return;
   case 'psel':LAN.sel=ds.id;return render();
@@ -843,7 +846,7 @@ function startTable(){
   new ResizeObserver(()=>drawAll()).observe(document.getElementById('tbl'));drawAll()}
 
 // ---------------- local edition (players join on your Wi-Fi)
-const LAN={on:false,code:'',title:'',url:'',players:[],chat:[],sel:'all',unread:0};
+const LAN={on:false,code:'',title:'',tableLink:'',url:'',players:[],chat:[],sel:'all',unread:0};
 const lanPost=(u,b)=>fetch(BASE+u,{method:'POST',headers:{'Content-Type':'application/json',...(OL&&DMKEY?{'X-DM-Key':DMKEY}:{})},body:JSON.stringify(b)}).then(async r=>{const j=await r.json().catch(()=>({}));if(!r.ok)throw{code:r.status>=500?'unavailable':'invalid_argument',message:j.error||('Server said '+r.status)};return j});
 function setTitle(t){LAN.title=String(t||'');document.title=(LAN.title?LAN.title+' · ':'')+'DM Screen';try{if(OL)localStorage.setItem('dm-title-'+OL,LAN.title)}catch{}}
 function savedMsg(){return OL?'Saved online':LAN.on?'Saved on this computer':'All changes saved'}
@@ -882,6 +885,7 @@ async function lanConnect(){
 // Online edition: the DM key comes in the link (?k=...), is kept in this browser, then removed from the address bar.
 async function onlineConnect(){
   if(!OL)return null;
+  if(VIEWER)return tableConnect();
   const q=new URLSearchParams(location.search);let k=q.get('k');
   if(k){try{localStorage.setItem('dm-key-'+OL,k)}catch{}history.replaceState(null,'',location.pathname+location.hash)}
   else{try{k=localStorage.getItem('dm-key-'+OL)}catch{}}
@@ -890,7 +894,7 @@ async function onlineConnect(){
   let r;try{r=await fetch(BASE+'/api/state',{headers:{'X-DM-Key':DMKEY},cache:'no-store'})}catch{throw new Error("Can't reach the DM Screen server. Check your internet.")}
   if(!r.ok)throw new Error(r.status===404?'That game no longer exists.':"That DM link doesn't work. Open the full link you got when you started the game.");
   const st=await r.json(),docs={};Object.assign(docs,st.docs||{});
-  setTitle(st.title);LAN.code=st.code;LAN.url=location.origin+BASE+'/';LAN.players=st.players||[];LAN.chat=st.chat||[];
+  setTitle(st.title);loadTableLink();LAN.code=st.code;LAN.url=location.origin+BASE+'/';LAN.players=st.players||[];LAN.chat=st.chat||[];
   const upload=async f=>{const r=await fetch(BASE+'/api/upload',{method:'POST',headers:{'Content-Type':f.type||'application/octet-stream','X-DM-Key':DMKEY},body:f});const j=await r.json().catch(()=>({}));if(!r.ok)throw{message:j.error||'Upload failed'};return j};
   const A=makeAdapter(docs,upload);
   let skipSync=true,retry=0,ping=null;
@@ -901,6 +905,27 @@ async function onlineConnect(){
     ws.onclose=()=>{clearInterval(ping);skipSync=false;setStatus('Lost the connection. Trying again…');setTimeout(open,Math.min(10000,1000*2**retry++))}};
   open();
   return{db:A.db,room:A.room,assets:A.assets}}
+// Projector / TV computer: view-only. Uses its own table key (?t=...) and receives only what the table screen draws.
+async function tableConnect(){
+  const q=new URLSearchParams(location.search);let k=q.get('t');
+  if(k){try{localStorage.setItem('dm-table-'+OL,k)}catch{}history.replaceState(null,'',location.pathname+location.hash)}
+  else{try{k=localStorage.getItem('dm-table-'+OL)}catch{}}
+  if(!k)throw new Error('This page needs the table link from the DM. Ask for it on the DM screen (Map tab, Table screen setup).');
+  TVKEY=k;
+  let r;try{r=await fetch(BASE+'/api/tstate',{headers:{'X-Table-Key':TVKEY},cache:'no-store'})}catch{throw new Error("Can't reach the DM Screen server. Check your internet.")}
+  if(!r.ok)throw new Error(r.status===404?'That game no longer exists.':'This table link was replaced or is wrong. Ask the DM for the new one.');
+  const st=await r.json(),docs={};Object.assign(docs,st.docs||{});LAN.code=st.code;
+  const A=makeAdapter(docs,async()=>{throw{message:'View only'}});
+  let skipSync=true,retry=0,ping=null,stop=false;
+  const open=()=>{if(stop)return;
+    const ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host+BASE+'/ws',['tv.'+TVKEY]);
+    ws.onopen=()=>{retry=0;clearInterval(ping);ping=setInterval(()=>{try{ws.send('ping')}catch{}},25000)};
+    ws.onmessage=e=>{if(e.data==='pong')return;let m;try{m=JSON.parse(e.data)}catch{return}if(m.type==='sync'&&skipSync){skipSync=false;return}A.feed(m)};
+    ws.onclose=e=>{clearInterval(ping);skipSync=false;if(e.code===4002){stop=true;setStatus('This table link was replaced. Ask the DM for the new one.');return}setTimeout(open,Math.min(10000,1000*2**retry++))}};
+  open();
+  return{db:A.db,room:A.room,assets:A.assets}}
+async function loadTableLink(){
+  try{const r=await fetch(BASE+'/api/tablekey',{headers:{'X-DM-Key':DMKEY},cache:'no-store'});const j=await r.json();if(r.ok&&j.key){LAN.tableLink=location.origin+BASE+'/table?t='+encodeURIComponent(j.key);if(!TABLE)render()}}catch{}}
 const pName=pid=>pid==='dm'?'You':pid==='all'?'Everyone':((LAN.players.find(p=>p.pid===pid)||{}).name||'A player who left');
 function lanEvent(m){
   if(m.type==='players'){LAN.players=m.players||[];if(TABLE)return;if(ui.tab==='players')render()}
