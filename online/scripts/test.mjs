@@ -13,7 +13,8 @@ const sock = (path, proto) => new Promise((res, rej) => {
 });
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const { j: s } = await post("/api/create", {});
+const { j: s } = await post("/api/create", { title: "  Friday   Night Quest " });
+ok(s.title === "Friday Night Quest", "title cleaned on create");
 ok(/^[A-Z]+-\d\d$/.test(s.code) && s.key, "create gives code " + s.code);
 const P = "/s/" + s.code, K = { "X-DM-Key": s.key };
 
@@ -61,8 +62,13 @@ ok((await J(P + "/api/upload", { method: "POST", headers: { ...K, "Content-Type"
 await post(P + "/api/kick", { pid: p2.pid }, K);
 await wait(300);
 ok((await J(P + "/api/pcheck?token=" + p2.token)).r.status === 401, "kicked player's token dead");
+ok((await J(P + "/api/info")).j.title === "Friday Night Quest", "title visible before joining");
+await post(P + "/api/title", { title: "Dragon Keep" }, K);
+await wait(300);
+ok(pl.got.some((m) => m.type === "title" && m.title === "Dragon Keep"), "title change reaches players");
+ok((await post(P + "/api/title", { title: "x" })).r.status === 403, "players cannot rename");
 const dm2 = await sock(P + "/ws", "dm." + s.key); await wait(300);
-ok(dm2.got[0]?.type === "sync" && dm2.got[0].players.length === 1, "reconnecting DM gets a full sync");
+ok(dm2.got[0]?.type === "sync" && dm2.got[0].players.length === 1 && dm2.got[0].title === "Dragon Keep", "reconnecting DM gets a full sync");
 for (const x of [dm.ws, pl.ws, pl2.ws, dm2.ws]) try { x.close(); } catch {}
 console.log(fails ? fails + " FAILED" : "ALL PASSED");
 process.exit(fails ? 1 : 0);

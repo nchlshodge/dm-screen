@@ -154,6 +154,7 @@ export class Session extends DurableObject {
       this.setMeta("keyHash", this.keyHash);
       this.setMeta("code", this.code);
       this.setMeta("created", String(Date.now()));
+      this.setMeta("title", String(b.title || "").slice(0, 40));
       for (const [p, d] of Object.entries(SEED.docs || {})) {
         this.q(`INSERT OR REPLACE INTO docs (path,data) VALUES (?,?)`, p, JSON.stringify(d));
       }
@@ -171,6 +172,7 @@ export class Session extends DurableObject {
 
     try {
       // ---- players
+      if (path === "/api/info") return json({ title: this.meta("title") || "" });
       if (path === "/api/join" && request.method === "POST") {
         const b = await request.json();
         const name = String(b.name || "").replace(/\s+/g, " ").trim().slice(0, 24) || "Player";
@@ -181,7 +183,7 @@ export class Session extends DurableObject {
         this.q(`INSERT INTO players (pid,name,token,char,joined) VALUES (?,?,?,NULL,?)`, pid, name, token, Date.now());
         this.toDM({ type: "players", players: this.playerList() });
         await this.touch();
-        return json({ token, pid, name });
+        return json({ token, pid, name, title: this.meta("title") || "" });
       }
       if (path === "/api/pcheck") {
         const p = this.playerByToken(url.searchParams.get("token"));
@@ -229,7 +231,7 @@ export class Session extends DurableObject {
       await this.touch();
 
       if (path === "/api/state") {
-        return json({ docs: this.allDocs(), code: this.code, url: "", players: this.playerList(), chat: this.chatForDM() });
+        return json({ docs: this.allDocs(), code: this.code, title: this.meta("title") || "", url: "", players: this.playerList(), chat: this.chatForDM() });
       }
       if (path === "/api/upload" && request.method === "POST") {
         const type = (request.headers.get("Content-Type") || "").split(";")[0].trim().toLowerCase();
@@ -263,6 +265,13 @@ export class Session extends DurableObject {
           }
         }
         return json({ ok: true });
+      }
+      if (path === "/api/title") {
+        const title = String(b.title || "").replace(/\s+/g, " ").trim().slice(0, 40);
+        this.setMeta("title", title);
+        this.toDM({ type: "title", title });
+        for (const p of this.q(`SELECT pid FROM players`)) this.toPlayer(p.pid, { type: "title", title });
+        return json({ ok: true, title });
       }
       if (path === "/api/emit") {
         this.toDM({ type: "room", topic: String(b.topic || "").slice(0, 48), data: b.data, tab: b.tab });
@@ -305,7 +314,7 @@ export class Session extends DurableObject {
       if (!(await this.dmOk(dmProto.slice(3)))) return new Response("Not allowed", { status: 403 });
       const [client, server] = Object.values(new WebSocketPair());
       this.ctx.acceptWebSocket(server, ["dm"]);
-      this.send(server, { type: "sync", docs: this.allDocs(), code: this.code, players: this.playerList(), chat: this.chatForDM() });
+      this.send(server, { type: "sync", docs: this.allDocs(), code: this.code, title: this.meta("title") || "", players: this.playerList(), chat: this.chatForDM() });
       await this.touch();
       return new Response(null, { status: 101, webSocket: client, headers: { "Sec-WebSocket-Protocol": dmProto } });
     }
@@ -314,7 +323,7 @@ export class Session extends DurableObject {
     const [client, server] = Object.values(new WebSocketPair());
     this.ctx.acceptWebSocket(server, ["p:" + p.pid]);
     const hero = p.char ? this.getDoc("heroes/" + p.char) : null;
-    this.send(server, { type: "hello", name: p.name, char: p.char, hero, heroes: this.heroList(), messages: this.msgsFor(p.pid) });
+    this.send(server, { type: "hello", title: this.meta("title") || "", name: p.name, char: p.char, hero, heroes: this.heroList(), messages: this.msgsFor(p.pid) });
     this.toDM({ type: "players", players: this.playerList() });
     return new Response(null, { status: 101, webSocket: client, headers: { "Sec-WebSocket-Protocol": pProto } });
   }

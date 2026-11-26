@@ -45,15 +45,17 @@ export default {
     if (path === "/" || path === "/index.html") return asset(env, request, "/index.html");
 
     if (path === "/api/create" && request.method === "POST") {
+      const body = await request.json().catch(() => ({}));
+      const title = String(body.title || "").replace(/\s+/g, " ").trim().slice(0, 40);
       for (let i = 0; i < 8; i++) {
         const code = newCode();
         const key = newKey();
         const stub = env.SESSION.get(env.SESSION.idFromName(code));
         const r = await stub.fetch("https://session/init", {
           method: "POST",
-          body: JSON.stringify({ code, keyHash: await sha256(key) }),
+          body: JSON.stringify({ code, title, keyHash: await sha256(key) }),
         });
-        if (r.status === 200) return json({ code, key });
+        if (r.status === 200) return json({ code, key, title });
       }
       return json({ error: "Could not make a code. Try again." }, 503);
     }
