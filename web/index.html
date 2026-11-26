@@ -34,7 +34,7 @@ header .top{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;justify-co
 header h1{font-size:clamp(26px,3.4vw,38px);letter-spacing:.02em}
 #status{font-size:14px;color:#b9d7d6}
 nav{display:flex;gap:4px;margin-top:14px;overflow-x:auto}
-nav a{color:#cfe6e4;text-decoration:none;padding:10px 18px;border-radius:10px 10px 0 0;font-weight:700;font-size:17px;white-space:nowrap}
+nav a{flex:0 0 auto;color:#cfe6e4;text-decoration:none;padding:10px 18px;border-radius:10px 10px 0 0;font-weight:700;font-size:17px;white-space:nowrap}
 nav a.cur{background:var(--bg);color:var(--ink)}
 main{padding:20px max(4vw,16px) 48px;max-width:1400px;margin:0 auto}
 .two{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:20px;align-items:start}
@@ -51,6 +51,7 @@ main{padding:20px max(4vw,16px) 48px;max-width:1400px;margin:0 auto}
 .foe .tag{background:var(--foe)}.other .tag{background:var(--mut)}
 .meta{font-size:14px;color:var(--mut)}
 .chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.shoprow{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-top:1px solid var(--line);align-items:baseline}.shoprow:first-of-type{border-top:0}.shoprow b{white-space:nowrap;text-align:right}.chip.on{background:var(--now);border-color:var(--now);color:#fff}
 .chip{font-size:13px;padding:2px 8px;border-radius:99px;border:1px solid var(--line);background:var(--soft);min-height:0;font-weight:600}
 .hpline{display:flex;align-items:baseline;justify-content:space-between;font-size:14px}.hpline b{font-size:20px}
 .hpbar{height:8px;border-radius:9px;background:var(--line);overflow:hidden;margin:3px 0 6px}.hpbar i{display:block;height:100%;background:var(--ok)}
@@ -140,7 +141,7 @@ details summary{cursor:pointer;font-weight:600;min-height:32px;display:flex;alig
 <body>
 <header id="hdr">
   <div class="top"><h1>DM Screen</h1><span><button id="sndbtn" class="sm" data-a="sndstop" hidden>Stop sound</button> <span id="status" role="status">Loading your game…</span></span></div>
-  <nav id="tabs"><a href="#combat">Combat</a><a href="#party">Party</a><a href="#monsters">Monsters</a><a href="#map">Map</a><a href="#dice">Dice</a><a href="#handouts">Handouts</a><a href="#sound">Sound</a><a href="#players" id="ptab" hidden>Players</a></nav>
+  <nav id="tabs"><a href="#combat">Combat</a><a href="#party">Party</a><a href="#monsters">Monsters</a><a href="#map">Map</a><a href="#dice">Dice</a><a href="#handouts">Handouts</a><a href="#shop">Shop</a><a href="#sound">Sound</a><a href="#players" id="ptab" hidden>Players</a></nav>
 </header>
 <main id="view"></main>
 <div id="toast" role="status" aria-live="polite"></div>
@@ -414,7 +415,7 @@ function levelUp(h,how,manual){
   return{from,to,gain,steps,slots:nt}}
 
 // ---------------- views
-const tabs=['combat','party','monsters','map','dice','handouts','sound','players'];
+const tabs=['combat','party','monsters','map','dice','handouts','shop','sound','players'];
 function render(){
   if(TABLE)return drawAll();
   const ae=document.activeElement,aid=ae&&ae.id;let ss=null,se=null;try{ss=ae.selectionStart;se=ae.selectionEnd}catch{}
@@ -422,7 +423,7 @@ function render(){
   if(ui.tab==='players')LAN.unread=0;
   const pt=document.getElementById('ptab');if(pt){pt.hidden=!LAN.on;pt.textContent=LAN.unread?`Players (${LAN.unread})`:'Players'}
   for(const a of document.querySelectorAll('#tabs a'))a.classList.toggle('cur',a.getAttribute('href')==='#'+ui.tab);
-  view.innerHTML=ui.tab==='party'?vEdit('hero'):ui.tab==='monsters'?vEdit('mon'):ui.tab==='map'?vMap():ui.tab==='dice'?vDice():ui.tab==='handouts'?vHand():ui.tab==='sound'?vSound():ui.tab==='players'&&LAN.on?vPlayers():vCombat();
+  view.innerHTML=ui.tab==='party'?vEdit('hero'):ui.tab==='monsters'?vEdit('mon'):ui.tab==='map'?vMap():ui.tab==='dice'?vDice():ui.tab==='handouts'?vHand():ui.tab==='shop'?vShop():ui.tab==='sound'?vSound():ui.tab==='players'&&LAN.on?vPlayers():vCombat();
   for(const d of view.querySelectorAll('details[id]'))d.open=!!(ui.open||{})[d.id];
   if(aid){const n=document.getElementById(aid);if(n&&n!==document.activeElement){n.focus();try{if(ss!=null)n.setSelectionRange(ss,se)}catch{}}}
   if(ui.tab==='map')drawAll()}
@@ -555,6 +556,355 @@ function vDice(){
    <label style="display:flex;gap:6px;align-items:center;color:var(--ink);margin-top:8px"><input type="checkbox" id="tsecret" data-tmp="1" style="width:auto" ${ui.tmp.tsecret?'checked':''}> Roll tables in secret</label></section>
    ${te?`<section><label for="tf-name">Table name</label><input id="tf-name" data-tf="name" value="${esc(te.name||'')}"><label for="tf-items" style="margin-top:8px">Entries, one per line</label><textarea id="tf-items" data-tf="items" style="min-height:220px">${esc(te.items||'')}</textarea><p class="hint">Make an entry more likely with a number and x: <span class="code">3x Goblin patrol</span>. Dice inside an entry get rolled: <span class="code">1d4 wolves</span>.</p><div class="bar"><button class="sm" data-a="tedit" data-id="">Done</button><button class="sm ${ui.arm==='tdel'?'arm':'danger'}" data-a="tdel">${ui.arm==='tdel'?'Click again to delete':'Delete'}</button></div></section>`:''}
   </aside></div>`}
+// ---------------- shop: prices for everyday gear and magic items, most common first
+// Gear prices follow the SRD / Player's Handbook (the 2024 book differs a little: change what you like).
+// Magic items: prices are the DMG guideline range for their rarity unless a known price is given. Consumables cost about half.
+const SHOP_RAW=`
+Gear
+Abacus|2gp
+Acid (vial)|25gp
+Alchemist's fire (flask)|50gp
+Antitoxin (vial)|50gp
+Arrows (20)|1gp
+Backpack|2gp
+Ball bearings (1,000)|1gp
+Bedroll|1gp
+Bell|1gp
+Block and tackle|1gp
+Book|25gp
+Bottle, glass|2gp
+Bucket|5cp
+Caltrops (20)|1gp
+Candle|1cp
+Chain (10 ft)|5gp
+Chalk (1 piece)|1cp
+Chest|5gp
+Climber's kit|25gp
+Clothes, common|5sp
+Clothes, costume|5gp
+Clothes, fine|15gp
+Clothes, traveler's|2gp
+Component pouch|25gp
+Crowbar|2gp
+Fishing tackle|1gp
+Flask|2cp
+Grappling hook|2gp
+Hammer|1gp
+Healer's kit|5gp
+Holy symbol|5gp
+Holy water (flask)|25gp
+Hourglass|25gp
+Hunting trap|5gp
+Ink (1 ounce)|10gp
+Jug|2cp
+Ladder (10 ft)|1sp
+Lamp|5sp
+Lantern, bullseye|10gp
+Lantern, hooded|5gp
+Lock|10gp
+Magnifying glass|100gp
+Manacles|2gp
+Mess kit|2sp
+Mirror, steel|5gp
+Oil (flask)|1sp
+Paper (one sheet)|2sp
+Parchment (one sheet)|1sp
+Perfume (vial)|5gp
+Pick, miner's|2gp
+Piton|5cp
+Poison, basic (vial)|100gp
+Pole (10 ft)|5cp
+Pot, iron|2gp
+Pouch|5sp
+Quiver|1gp
+Ram, portable|4gp
+Rations (1 day)|5sp
+Robes|1gp
+Rope, hempen (50 ft)|1gp
+Rope, silk (50 ft)|10gp
+Sack|1cp
+Scale, merchant's|5gp
+Sealing wax|5sp
+Shovel|2gp
+Signal whistle|5cp
+Signet ring|5gp
+Soap|2cp
+Spellbook|50gp
+Spyglass|1000gp
+Tent, two-person|2gp
+Tinderbox|5sp
+Torch|1cp
+Vial|1gp
+Waterskin|2sp
+Whetstone|1cp
+Weapons
+Club|1sp
+Dagger|2gp
+Greatclub|2sp
+Handaxe|5gp
+Javelin|5sp
+Light hammer|2gp
+Mace|5gp
+Quarterstaff|2sp
+Sickle|1gp
+Spear|1gp
+Dart|5cp
+Light crossbow|25gp
+Shortbow|25gp
+Sling|1sp
+Battleaxe|10gp
+Flail|10gp
+Glaive|20gp
+Greataxe|30gp
+Greatsword|50gp
+Halberd|20gp
+Lance|10gp
+Longsword|15gp
+Maul|10gp
+Morningstar|15gp
+Pike|5gp
+Rapier|25gp
+Scimitar|25gp
+Shortsword|10gp
+Trident|5gp
+War pick|5gp
+Warhammer|15gp
+Whip|2gp
+Blowgun|10gp
+Hand crossbow|75gp
+Heavy crossbow|50gp
+Longbow|50gp
+Net|1gp
+Armor
+Padded armor|5gp
+Leather armor|10gp
+Hide armor|10gp
+Studded leather armor|45gp
+Chain shirt|50gp
+Scale mail|50gp
+Ring mail|30gp
+Chain mail|75gp
+Breastplate|400gp
+Half plate armor|750gp
+Splint armor|200gp
+Plate armor|1500gp
+Shield|10gp
+Tools
+Dice set|1sp
+Playing card set|5sp
+Chess set|1gp
+Cook's utensils|1gp
+Weaver's tools|1gp
+Woodcarver's tools|1gp
+Flute|2gp
+Shawm|2gp
+Horn|3gp
+Cobbler's tools|5gp
+Herbalist's kit|5gp
+Leatherworker's tools|5gp
+Drum|6gp
+Carpenter's tools|8gp
+Calligrapher's supplies|10gp
+Mason's tools|10gp
+Painter's supplies|10gp
+Potter's tools|10gp
+Pan flute|12gp
+Cartographer's tools|15gp
+Forgery kit|15gp
+Brewer's supplies|20gp
+Smith's tools|20gp
+Dulcimer|25gp
+Disguise kit|25gp
+Jeweler's tools|25gp
+Navigator's tools|25gp
+Thieves' tools|25gp
+Bagpipes|30gp
+Glassblower's tools|30gp
+Lyre|30gp
+Viol|30gp
+Lute|35gp
+Alchemist's supplies|50gp
+Poisoner's kit|50gp
+Tinker's tools|50gp
+Mounts
+Saddlebags|4gp
+Saddle, pack|5gp
+Saddle, riding|10gp
+Saddle, military|20gp
+Donkey or mule|8gp
+Mastiff|25gp
+Pony|30gp
+Camel|50gp
+Draft horse|50gp
+Riding horse|75gp
+Elephant|200gp
+Warhorse|400gp
+Cart|15gp
+Sled|20gp
+Wagon|35gp
+Carriage|100gp
+Rowboat|50gp
+Keelboat|3000gp
+Longship|10000gp
+Sailing ship|10000gp
+Warship|25000gp
+Galley|30000gp
+Services
+Road or gate toll|1cp
+Meal, squalid|3cp
+Ale (mug)|4cp
+Meal, poor|6cp
+Messenger (per mile)|2cp
+Inn, squalid (per day)|7cp
+Meal, modest|3sp
+Wine, common (pitcher)|2sp
+Hireling, untrained (per day)|2sp
+Inn, poor (per day)|1sp
+Meal, comfortable|5sp
+Inn, modest (per day)|5sp
+Inn, comfortable (per day)|8sp
+Meal, wealthy|8sp
+Inn, wealthy (per day)|2gp
+Meal, aristocratic|2gp
+Hireling, skilled (per day)|2gp
+Inn, aristocratic (per day)|4gp
+Wine, fine (bottle)|10gp
+Magic
+Potion of healing|c:50gp
+Spell scroll (cantrip)|c:25gp
+Spell scroll (1st level)|c:75gp
+Potion of climbing|c
+Potion of water breathing|u
+Spell scroll (2nd level)|u:150gp
+Potion of greater healing|u:150gp
+Potion of fire breath|u
+Potion of hill giant strength|u
+Bag of holding|u
+Boots of elvenkind|u
+Boots of striding and springing|u
+Bracers of archery|u
+Brooch of shielding|u
+Cloak of elvenkind|u
+Cloak of protection|u
+Decanter of endless water|u
+Driftglobe|u
+Dust of disappearance|u
+Eyes of charming|u
+Gauntlets of ogre power|u
+Gloves of swimming and climbing|u
+Goggles of night|u
+Hat of disguise|u
+Headband of intellect|u
+Helm of telepathy|u
+Immovable rod|u
+Javelin of lightning|u
+Lantern of revealing|u
+Medallion of thoughts|u
+Pearl of power|u
+Periapt of health|u
+Ring of swimming|u
+Ring of water walking|u
+Rope of climbing|u
+Slippers of spider climbing|u
+Stone of good luck|u
+Wand of magic missiles|u
+Wand of web|u
+Weapon, +1|u
+Shield, +1|u
+Winged boots|u
+Spell scroll (3rd level)|r:300gp
+Potion of superior healing|r:500gp
+Potion of heroism|r
+Amulet of health|r
+Armor, +1|r
+Boots of speed|r
+Cloak of displacement|r
+Cube of force|r
+Flame tongue|r
+Folding boat|r
+Instant fortress|r
+Necklace of fireballs|r
+Portable hole|r
+Ring of free action|r
+Ring of protection|r
+Ring of spell storing|r
+Staff of healing|r
+Sun blade|r
+Sword of life stealing|r
+Wand of fireballs|r
+Wand of lightning bolts|r
+Wand of paralysis|r
+Weapon, +2|r
+Shield, +2|r
+Wings of flying|r
+Potion of supreme healing|v:1350gp
+Potion of invisibility|v
+Potion of speed|v
+Potion of flying|v
+Armor, +2|v
+Bag of devouring|v
+Carpet of flying|v
+Crystal ball|v
+Dragon scale mail|v
+Dwarven plate|v
+Efreeti bottle|v
+Frost brand|v
+Oathbow|v
+Ring of regeneration|v
+Rod of absorption|v
+Staff of fire|v
+Staff of power|v
+Staff of striking|v
+Sword of sharpness|v
+Wand of polymorph|v
+Weapon, +3|v
+Shield, +3|v
+Amulet of the planes|v
+Apparatus of Kwalish|l
+Armor, +3|l
+Armor of invulnerability|l
+Deck of many things|l
+Holy avenger|l
+Ring of invisibility|l
+Ring of three wishes|l
+Rod of lordly might|l
+Sphere of annihilation|l
+Staff of the magi|l
+Sword, vorpal|l
+Universal solvent|l
+`;
+const SHOP_MAGIC={c:['Common magic','50–100 gp'],u:['Uncommon magic','101–500 gp'],r:['Rare magic','501–5,000 gp'],v:['Very rare magic','5,001–50,000 gp'],l:['Legendary magic','50,001 gp and up']};
+const SHOP_BANDS=[['Everyday','under 1 gp'],['Common','1–50 gp'],['Costly','over 50 gp']];
+const SHOP_ORDER=['Everyday','Common','Costly','c','u','r','v','l'];
+const SHOP_CATS=['Gear','Weapons','Armor','Tools','Mounts','Services','Magic'];
+const SHOP=(()=>{const out=[];let cat='Gear';
+  const cp=t=>{const m=/^(\d+)(gp|sp|cp)$/.exec(t);return m?(+m[1])*({gp:100,sp:10,cp:1}[m[2]]):0};
+  for(const line of SHOP_RAW.trim().split('\n')){
+    if(!line.includes('|')){cat=line.trim();continue}
+    const [name,p]=line.split('|');
+    if(cat==='Magic'){const [r,x]=p.split(':');out.push({name,cat,tier:r,cp:x?cp(x):0,known:!!x})}
+    else{const c=cp(p);out.push({name,cat,tier:c<100?'Everyday':c<=5000?'Common':'Costly',cp:c,known:true})}}
+  return out})();
+const fmtCp=c=>c>=100&&c%100===0?(c/100).toLocaleString('en-US')+' gp':c>=100?(c/100).toLocaleString('en-US',{maximumFractionDigits:2})+' gp':c%10===0?(c/10)+' sp':c+' cp';
+function shopHtml(){
+  const q=String(ui.tmp.shopq||'').trim().toLowerCase(),cat=ui.tmp.shopcat||'';
+  const items=SHOP.filter(i=>(!cat||i.cat===cat)&&(!q||i.name.toLowerCase().includes(q)||i.cat.toLowerCase().includes(q)));
+  if(!items.length)return '<p class="hint">Nothing matches that. Try a shorter word.</p>';
+  let h='';
+  for(const t of SHOP_ORDER){
+    const rows=items.filter(i=>i.tier===t).sort((a,b)=>a.cp-b.cp||a.name.localeCompare(b.name));if(!rows.length)continue;
+    const magic=!!SHOP_MAGIC[t],head=magic?SHOP_MAGIC[t][0]:t,band=magic?SHOP_MAGIC[t][1]:(SHOP_BANDS.find(b=>b[0]===t)||[])[1];
+    h+=`<section class="card shoptier"><div class="bar"><h3 style="margin:0 auto 0 0">${esc(head)}</h3><span class="hint">${esc(band)}</span></div>`
+      +rows.map(i=>`<div class="shoprow"><span>${esc(i.name)}<span class="hint"> ${esc(i.cat)}</span></span><b>${i.known?esc(fmtCp(i.cp)):'<span class="hint" style="font-weight:600">'+esc(SHOP_MAGIC[t][1])+'</span>'}</b></div>`).join('')+'</section>'}
+  return h}
+function refreshShop(){const el=document.getElementById('shoplist');if(el)el.innerHTML=shopHtml()}
+function vShop(){
+  const cat=ui.tmp.shopcat||'';
+  return `<div class="card"><h2 style="margin:0 0 4px;font-size:24px">Shop prices</h2><p class="hint" style="margin:0 0 10px">Everyday gear first, then magic items from common to legendary. Cheapest first within each group.</p>
+  <input id="shopq" data-tmp="1" type="search" placeholder="Search items, e.g. sword, potion, armor" value="${tmpv('shopq')}" autocomplete="off" aria-label="Search shop items">
+  <div class="chips" style="margin-top:8px"><button class="chip ${cat?'':'on'}" data-a="shopcat" data-id="">All</button>${SHOP_CATS.map(c=>`<button class="chip ${cat===c?'on':''}" data-a="shopcat" data-id="${c}">${c}</button>`).join('')}</div></div>
+  <div id="shoplist" style="display:grid;gap:12px;margin-top:12px">${shopHtml()}</div>
+  <p class="hint" style="margin-top:12px">Gear prices follow the SRD. The 2024 books differ slightly, so change anything you like. Magic item prices are guideline ranges for their rarity (potions and scrolls cost about half as much as other items of the same rarity). Rarity and prices are the DM's call.</p>`}
 function vHand(){
   const hs=Object.entries(S.handouts).sort((a,b)=>String(a[1].title).localeCompare(b[1].title)),ho=ui.hedit&&S.handouts[ui.hedit],on=S.map.handout;
   const list=hs.map(([id,h])=>`<button class="pc ${ui.hedit===id?'sel':''}" data-a="hedit" data-id="${id}"><div class="nm" style="font-size:17px">${esc(h.title||'Untitled')}${on===id?'<span class="tag">On table</span>':''}</div><div class="meta">${h.img?'Picture':''}${h.img&&h.text?' + ':''}${h.text?'Text':''}${!h.img&&!h.text?'Empty':''}</div></button>`).join('');
@@ -766,6 +1116,7 @@ function act(a,ds,el){
   case 'sgo':if(ds.id)switchScene(ds.id);return;
   case 'sdel':if(ui.arm!=='sdel'+ds.id){ui.arm='sdel'+ds.id;return render()}ui.arm=null;delete S.scenes[ds.id];save('scenes/'+ds.id,null);return render();
   case 'savetitle':lanPost('/api/title',{title:ui.tmp.gtitle??LAN.title}).then(j=>{setTitle(j.title);delete ui.tmp.gtitle;render();toast('Game name saved')}).catch(e=>toast(e.message));return;
+  case 'shopcat':ui.tmp.shopcat=ds.id||'';return render();
   case 'charexp':return exportHeroes(Object.keys(S.heroes));
   case 'charexp1':return exportHeroes(ui.edit&&ui.edit.kind==='hero'?[ui.edit.id]:[]);
   case 'copytable':(navigator.clipboard?navigator.clipboard.writeText(LAN.tableLink):Promise.reject()).then(()=>toast('Table link copied')).catch(()=>toast(LAN.tableLink));return;
@@ -794,7 +1145,7 @@ document.addEventListener('input',e=>{const t=e.target;
   if(t.dataset.hf){const o=S.handouts[ui.hedit];if(o){o[t.dataset.hf]=t.value;save('handouts/'+ui.hedit,o);if(S.map.handout===ui.hedit)emitMap()}return}
   if(t.dataset.mn){S.map.name=t.value;saveMap();return}
   if(t.id==='vol'){setVol(+t.value);return}
-  if(t.dataset.tmp){ui.tmp[t.id]=t.type==='checkbox'?t.checked:t.value;if(t.id==='brush')ui.brush=+t.value;if(t.id==='esearch')refreshList();if(t.id==='addms'){const sel=document.getElementById('addm');if(sel)sel.innerHTML=monOpts()}return}
+  if(t.dataset.tmp){ui.tmp[t.id]=t.type==='checkbox'?t.checked:t.value;if(t.id==='brush')ui.brush=+t.value;if(t.id==='shopq')return refreshShop();if(t.id==='esearch')refreshList();if(t.id==='addms'){const sel=document.getElementById('addm');if(sel)sel.innerHTML=monOpts()}return}
   if(t.dataset.f||t.dataset.slot){const ed=ui.edit;if(!ed)return;const o=(ed.kind==='hero'?S.heroes:S.monsters)[ed.id];if(!o)return;
     if(t.dataset.slot){o.slots=normSlots(o.slots);const s=o.slots[+t.dataset.slot];s.max=Math.max(0,Math.min(9,Math.round(num(t.value))));s.used=Math.min(s.used,s.max)}
     else o[t.dataset.f]=t.type==='number'?(t.value===''?'':num(t.value)):t.value;
