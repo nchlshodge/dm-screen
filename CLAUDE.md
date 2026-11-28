@@ -34,6 +34,7 @@ A D&D dashboard for in-person games with kids aged 10–12 (Lego minis on a proj
 ## Before you ship a change
 - Test at desktop width and at 390px wide. Zero console errors.
 - A security hook on the Write tool can mistake the SQL helper call in `session.js` for a shell command. The file uses a `q()` wrapper for that reason. If a Write is blocked, write the file with a Bash heredoc.
+- After an update, refresh both the DM window and the table (second) window. Each loads its own copy of the page, so a window left open keeps the old version. Check this before reporting a new feature as "not showing".
 - Work on a feature branch and open a PR. Merge and deploy only when Nick says so.
 
 ## Known limits
